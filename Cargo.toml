@@ -1,0 +1,24 @@
+[package]
+name = "riftdb"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[lib]
+name = "librift"
+path = "src/lib.rs"
+
+[[bin]]
+name = "riftd"
+path = "src/main.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "riftctl"
+path = "src/bin/riftctl.rs"
+test = false
+bench = false
