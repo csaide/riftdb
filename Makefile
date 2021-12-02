@@ -91,10 +91,9 @@ compile: compile-bin.$(BUILD_OS)-$(BUILD_ARCH)
 HASH ?= $(shell git rev-parse HEAD)
 docker:
 	@bash ./dist/bin/print.sh "Building image"
-	@docker buildx build \
+	@docker buildx build --no-cache\
 		--platform linux/arm64,linux/amd64 \
-		--tag supernomad/riftdb:$(HASH) \
-		--tag supernomad/riftdb:latest \
+		--tag ghcr.io/csaide/riftdb:$(HASH) \
 		--build-arg BUILD=release \
 		--push \
 		--file ./dist/docker/riftdb/Dockerfile \

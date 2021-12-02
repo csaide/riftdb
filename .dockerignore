@@ -2,7 +2,7 @@
 **
 
 # Cargo configuration.
-!.cargo/
+!.cargo/*
 !Cargo.toml
 !Cargo.lock
 
@@ -11,4 +11,5 @@
 !Makefile
 
 # Source code.
-!src/
+!src/*
+!src/**

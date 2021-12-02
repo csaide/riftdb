@@ -37,7 +37,7 @@ COPY . .
 ARG TARGETARCH
 ARG BUILD=debug
 
-RUN make BUILD=${BUILD} BUILD_ARCH=${TARGETARCH} compile
+RUN ls -alh src/ && make BUILD=${BUILD} BUILD_ARCH=${TARGETARCH} compile
 
 FROM --platform=${TARGETPLATFORM} gcr.io/distroless/base AS runtime
 
@@ -46,6 +46,8 @@ ARG BUILD=debug
 
 COPY --from=build --chown=nonroot:nonroot --chmod=0700 /opt/riftdb/target/output/riftd-${BUILD}-linux-${TARGETARCH} /bin/riftd
 COPY --from=build --chown=nonroot:nonroot --chmod=0700 /opt/riftdb/target/output/riftctl-${BUILD}-linux-${TARGETARCH} /bin/riftctl
+
+LABEL org.opencontainers.image.source=https://github.com/csaide/riftdb
 
 USER nonroot
 VOLUME [ "/var/lib/riftd" ]
