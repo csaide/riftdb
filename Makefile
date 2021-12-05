@@ -94,6 +94,7 @@ docker:
 		--tag ghcr.io/csaide/riftdb:$(HASH) \
 		--build-arg BUILD=release \
 		--file ./dist/docker/riftdb/Dockerfile \
+		--push \
 		.
 
 ###

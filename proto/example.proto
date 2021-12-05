@@ -1,0 +1,21 @@
+// (c) Copyright 2021 Christian Saide
+// SPDX-License-Identifier: GPL-3.0
+
+syntax = "proto3";
+package example;
+
+// The request object to initiate a SayHello request.
+message HelloRequest {
+    // The name of the requester.
+    string name = 1;
+}
+
+// The response object returned by a SayHello invocation.
+message HelloResponse {
+    // The response to the requester.
+    string message = 1;
+}
+
+service Greeter {
+    rpc SayHello (HelloRequest) returns (HelloResponse);
+}

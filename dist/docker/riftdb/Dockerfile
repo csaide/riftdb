@@ -19,6 +19,7 @@ RUN apt-get update \
     && rustup target add x86_64-unknown-linux-gnu ;; \
     *) exit 1 ;; \
     esac \
+    && rustup component add rustfmt \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy in the Cargo configuration to fetch deps.

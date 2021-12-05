@@ -10,7 +10,9 @@
 !dist/bin/*
 !dist/docker/development/.bashrc
 !Makefile
+!build.rs
 
 # Source code.
 !src/*
 !src/**
+!proto/*
