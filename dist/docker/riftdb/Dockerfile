@@ -34,7 +34,7 @@ ARG BUILD=debug
 
 RUN make BUILD=${BUILD} BUILD_ARCH=${TARGETARCH} compile
 
-FROM --platform=${TARGETPLATFORM} gcr.io/distroless/base AS runtime
+FROM --platform=${TARGETPLATFORM} gcr.io/distroless/static AS runtime
 
 ARG TARGETARCH
 ARG BUILD=debug

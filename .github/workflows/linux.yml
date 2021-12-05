@@ -79,7 +79,7 @@ jobs:
         run: sudo apt-get update -yqq && sudo apt-get install -yqq gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
       - name: Cache
         uses: Swatinem/rust-cache@v1
-      - name: Go Build
+      - name: Build
         run: make compile.linux
 
   docker:

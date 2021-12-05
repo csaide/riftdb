@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'riftd'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=riftd",
+                    "--package=riftdb",
+                    "--target",
+                    "x86_64-unknown-linux-gnu"
+                ],
+                "filter": {
+                    "name": "riftd",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'riftctl'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=riftctl",
+                    "--package=riftdb",
+                    "--target",
+                    "x86_64-unknown-linux-gnu"
+                ],
+                "filter": {
+                    "name": "riftctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

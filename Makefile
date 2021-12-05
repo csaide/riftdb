@@ -66,7 +66,7 @@ docs:
 compile-bin.%:
 	@bash ./dist/bin/print.sh "Building target: '$*' mode: '$(BUILD)'"
 	@mkdir -p ./target/output/$(BUILD)
-	@cargo build $(build_$(BUILD)) --target $(target_$*)
+	@RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build $(build_$(BUILD)) --target $(target_$*)
 	@if [ "$(BUILD)" = "release" ]; then bash ./dist/bin/strip-compress.sh "$(BUILD)" "$(target_$*)" "$(strip_$*)"; fi
 	@bash dist/bin/package.sh "$(BUILD)" "$(target_$*)" "$*"
 
