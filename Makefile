@@ -65,12 +65,10 @@ docs:
 # Ensure we compile each of the targets properly using the correct mode.
 compile-bin.%:
 	@bash ./dist/bin/print.sh "Building target: '$*' mode: '$(BUILD)'"
-	@mkdir -p ./target/output
+	@mkdir -p ./target/output/$(BUILD)
 	@cargo build $(build_$(BUILD)) --target $(target_$*)
-	@if [ "$(BUILD)" = "release" ]; then $(strip_$*) -s ./target/$(target_$*)/$(BUILD)/riftd;   upx -9 -q ./target/$(target_$*)/$(BUILD)/riftd; fi
-	@if [ "$(BUILD)" = "release" ]; then $(strip_$*) -s ./target/$(target_$*)/$(BUILD)/riftctl; upx -9 -q ./target/$(target_$*)/$(BUILD)/riftctl; fi
-	@rm -f ./target/output/riftd-$(BUILD)-$*   && cp ./target/$(target_$*)/$(BUILD)/riftd ./target/output/riftd-$(BUILD)-$*
-	@rm -f ./target/output/riftctl-$(BUILD)-$* && cp ./target/$(target_$*)/$(BUILD)/riftctl ./target/output/riftctl-$(BUILD)-$*
+	@if [ "$(BUILD)" = "release" ]; then bash ./dist/bin/strip-compress.sh "$(BUILD)" "$(target_$*)" "$(strip_$*)"; fi
+	@bash dist/bin/package.sh "$(BUILD)" "$(target_$*)" "$*"
 
 # Build all targets for the biven OS.
 compile-exp.%: $$(foreach target,$$(target_$$*),compile-bin.$$(target))
@@ -91,11 +89,10 @@ compile: compile-bin.$(BUILD_OS)-$(BUILD_ARCH)
 HASH ?= $(shell git rev-parse HEAD)
 docker:
 	@bash ./dist/bin/print.sh "Building image"
-	@docker buildx build --no-cache\
+	@docker buildx build \
 		--platform linux/arm64,linux/amd64 \
 		--tag ghcr.io/csaide/riftdb:$(HASH) \
 		--build-arg BUILD=release \
-		--push \
 		--file ./dist/docker/riftdb/Dockerfile \
 		.
 

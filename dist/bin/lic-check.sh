@@ -54,7 +54,7 @@ function count_files_missing_copy() {
 
 if [ $(count_files_missing_lic) -ne 0 ]; then
     cat <<EOF
-There are files missing the 'SPDX-License-Identifier: MIT' license identifier.
+There are files missing the 'SPDX-License-Identifier: GPL-3.0' license identifier.
 
 Files:
 $(list_files_missing_lic)

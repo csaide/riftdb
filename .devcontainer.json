@@ -1,6 +1,6 @@
 {
     "build": {
-        "dockerfile": "./dist/docker/Dockerfile.development",
+        "dockerfile": "./dist/docker/development/Dockerfile",
         "context": ".",
     },
     "runArgs": [
