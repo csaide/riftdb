@@ -30,6 +30,12 @@ RUN rustup component add rust-std \
 RUN curl -L https://github.com/rust-analyzer/rust-analyzer/releases/latest/download/rust-analyzer-linux -o /usr/bin/rust-analyzer \
     && chmod +x /usr/bin/rust-analyzer
 
+# Install dive
+ENV DIVE_VERSION "0.9.2"
+RUN wget https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb \
+    && apt-get install -yqq ./dive_${DIVE_VERSION}_linux_amd64.deb \
+    && rm -f ./dive_${DIVE_VERSION}_linux_amd64.deb
+
 # Install docker cli
 ARG docker_gid=968
 ENV DOCKER_DEPS "apt-transport-https ca-certificates curl gnupg2 software-properties-common"

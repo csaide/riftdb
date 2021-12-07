@@ -1,7 +1,7 @@
 // (c) Copyright 2021 Christian Saide
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::grpc::example;
+use crate::grpc::kv;
 use crate::log;
 
 use exitcode::ExitCode;
@@ -51,7 +51,7 @@ pub async fn run() -> ExitCode {
     let root_logger = log::new(&cfg.log_config, RIFTCTL, crate_version!());
     info!(root_logger, "Hello world!");
 
-    let mut client = match example::GreeterClient::connect(cfg.remote_addr.clone()).await {
+    let mut client = match kv::KvClient::connect(cfg.remote_addr.clone()).await {
         Ok(client) => client,
         Err(err) => {
             crit!(root_logger, "Failed to connect to remote endpoint."; "error" => err.to_string(), "addr" => &cfg.remote_addr);
@@ -59,11 +59,15 @@ pub async fn run() -> ExitCode {
         }
     };
 
-    let request = tonic::Request::new(example::HelloRequest {
-        name: "Tonic".into(),
+    let key = Vec::from(b"i_am_a_key".as_ref());
+
+    let request = tonic::Request::new(kv::KeyValue {
+        ttl: 1000000000,
+        key: key.clone(),
+        value: Vec::from(b"i_am_a_value".as_ref()),
     });
 
-    let response = match client.say_hello(request).await {
+    let response = match client.set(request).await {
         Ok(resp) => resp,
         Err(err) => {
             crit!(root_logger, "Failed to execute say hello on remote server."; "error" => err.to_string());
@@ -72,5 +76,18 @@ pub async fn run() -> ExitCode {
     };
 
     info!(root_logger, "RESPONSE={:?}", response);
+
+    let request = tonic::Request::new(kv::Key { key: key.clone() });
+
+    let response = match client.get(request).await {
+        Ok(resp) => resp,
+        Err(err) => {
+            crit!(root_logger, "Failed to retrieve set value."; "error" => err.to_string());
+            return exitcode::IOERR;
+        }
+    };
+
+    info!(root_logger, "RESPONSE={:?}", response);
+
     exitcode::OK
 }

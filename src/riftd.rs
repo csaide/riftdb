@@ -3,8 +3,11 @@
 
 use std::net::SocketAddr;
 
-use crate::grpc::example;
+use crate::grpc::kv;
+use crate::http;
 use crate::log;
+use crate::metric;
+use crate::store;
 
 use exitcode::ExitCode;
 use structopt::clap::{self, crate_version, ErrorKind};
@@ -34,6 +37,16 @@ struct RiftdConfig {
         takes_value = true
     )]
     grpc_addr: SocketAddr,
+    #[structopt(
+        long = "http-addr",
+        short = "a",
+        env = "RIFT_HTTP_ADDR",
+        help = "The address to listen on for incoming HTTP requests.",
+        long_help = "This sets the listen address for all incoming HTTP control plane requests.",
+        default_value = "[::]:8080",
+        takes_value = true
+    )]
+    http_addr: SocketAddr,
 }
 
 /// Execute riftd.
@@ -56,15 +69,41 @@ pub async fn run() -> ExitCode {
     let root_logger = log::new(&cfg.log_config, RIFTD, crate_version!());
     info!(root_logger, "Hello world!");
 
-    let greeter = example::GreeterImpl::default();
-    if let Err(err) = Server::builder()
-        .add_service(example::GreeterServer::new(greeter))
-        .serve(cfg.grpc_addr)
-        .await
-    {
-        crit!(root_logger, "Failed to listen and serve gRPC."; "error" => err.to_string());
-        return exitcode::IOERR;
-    }
+    let mm = metric::Manager::new(
+        "rift".to_string(),
+        "grpc".to_string(),
+        "riftd".to_string(),
+        crate_version!().to_string(),
+    );
 
-    exitcode::OK
+    let memory = store::HashStore::new();
+    let kv_impl = kv::KVImpl::new(memory);
+
+    let grpc_logger = root_logger.new(o!("mod" => "grpc"));
+    let grpc_handle = async move {
+        if let Err(err) = Server::builder()
+            .add_service(kv::KvServer::with_interceptor(
+                kv_impl,
+                crate::grpc::interceptor::RiftInterceptor::new(&grpc_logger, mm),
+            ))
+            .serve(cfg.grpc_addr)
+            .await
+        {
+            crit!(&grpc_logger, "Failed to listen and serve gRPC."; "error" => err.to_string());
+        }
+    };
+
+    let http_logger = root_logger.new(o!("mod" => "http"));
+    let http_handle = async move {
+        if let Err(err) = http::listen(&cfg.http_addr).await {
+            crit!(&http_logger, "Failed to listen and serve HTTP."; "error" => err.to_string());
+        }
+    };
+
+    tokio::select! {
+        _ = grpc_handle => {},
+        _ = http_handle => {},
+    };
+
+    exitcode::IOERR
 }
