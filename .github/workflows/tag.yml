@@ -1,0 +1,25 @@
+# (c) Copyright 2021 Christian Saide
+# SPDX-License-Identifier: GPL-3.0
+
+name: tag
+
+on:
+  push:
+    tags: v[1-9]+.[0-9]+.[0-9]+
+
+jobs:
+  promote:
+    name: promote
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote
+        run: |
+          docker pull ghcr.io/csaide/riftdb:${{ github.sha }}
+          docker tag ghcr.io/csaide/riftdb:${{ github.sha }} ghcr.io/csaide/riftdb:${{ github.ref_name }}
+          docker push ghcr.io/csaide/riftdb:${{ github.ref_name }}
