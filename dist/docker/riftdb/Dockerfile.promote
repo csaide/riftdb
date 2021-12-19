@@ -1,0 +1,5 @@
+# (c) Copyright 2021 Christian Saide
+# SPDX-License-Identifier: GPL-3.0
+
+ARG HASH
+FROM --platform=${TARGETPLATFORM} ghcr.io/csaide/riftdb:${HASH}

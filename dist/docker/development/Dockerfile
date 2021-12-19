@@ -36,6 +36,19 @@ RUN wget https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/di
     && apt-get install -yqq ./dive_${DIVE_VERSION}_linux_amd64.deb \
     && rm -f ./dive_${DIVE_VERSION}_linux_amd64.deb
 
+# Install grpcurl
+ENV GRPCURL_VERSION "1.8.5"
+RUN wget https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz \
+    && tar xzvf grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz \
+    && mv grpcurl /usr/bin/ \
+    && rm -rf
+
+# Install grpc_health_probe
+ENV GRPC_HEALTH_PROBE_VERSION "v0.4.6"
+RUN curl -L https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 --output grpc_health_probe \
+    && chmod +x grpc_health_probe \
+    && mv grpc_health_probe /usr/bin
+
 # Install docker cli
 ARG docker_gid=968
 ENV DOCKER_DEPS "apt-transport-https ca-certificates curl gnupg2 software-properties-common"
