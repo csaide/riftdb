@@ -29,18 +29,21 @@ async fn live() -> Result<Response<Body>, hyper::http::Error> {
     no_content()
 }
 
+#[inline]
 fn no_content() -> Result<Response<Body>, hyper::http::Error> {
     Response::builder()
         .status(hyper::StatusCode::NO_CONTENT)
         .body(Body::empty())
 }
 
+#[inline]
 fn server_error() -> Result<Response<Body>, hyper::http::Error> {
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(Body::from("Internal Server Error"))
 }
 
+#[inline]
 fn not_found() -> Result<Response<Body>, hyper::http::Error> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)

@@ -28,7 +28,7 @@ impl FromStr for Level {
     /// Handles converting the supplied static &str to a Level. In the event
     /// the supplied static &str is not defined, an Error::InvalidLevel is returned.
     ///
-    /// ```rust
+    /// ```
     /// use std::str::FromStr;
     /// let x = librift::log::Level::from_str("critical");
     /// assert_eq!(x.is_ok(), true);
@@ -52,7 +52,7 @@ impl Level {
     /// Handles converting the internal  log level to the lower level slog representation
     /// of log levels for consumption.
     ///
-    /// ```rust
+    /// ```
     /// use std::str::FromStr;
     /// let x = librift::log::Level::Crit;
     /// assert_eq!(x.to_slog(), slog::Level::Critical);

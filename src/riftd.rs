@@ -4,6 +4,7 @@
 use std::net::SocketAddr;
 
 use crate::grpc::kv;
+use crate::grpc::topic;
 use crate::http;
 use crate::log;
 use crate::metric;
@@ -42,7 +43,7 @@ struct RiftdConfig {
         short = "a",
         env = "RIFT_HTTP_ADDR",
         help = "The address to listen on for incoming HTTP requests.",
-        long_help = "This sets the listen address for all incoming HTTP control plane requests.",
+        long_help = "This sets the listen address for all incoming HTTP requests.",
         default_value = "[::]:8080",
         takes_value = true
     )]
@@ -67,7 +68,6 @@ pub async fn run() -> ExitCode {
     };
 
     let root_logger = log::new(&cfg.log_config, RIFTD, crate_version!());
-    info!(root_logger, "Hello world!");
 
     let mm = metric::Manager::new(
         "rift".to_string(),
@@ -77,15 +77,37 @@ pub async fn run() -> ExitCode {
     );
 
     let memory = store::HashStore::new();
-    let kv_impl = kv::KVImpl::new(memory);
+    let kv_impl = kv::Handler::new(memory);
+    let topic_impl = topic::Handler::default();
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_service_status("", tonic_health::ServingStatus::Serving)
+        .await;
+    health_reporter
+        .set_service_status("kv.KV", tonic_health::ServingStatus::Serving)
+        .await;
 
     let grpc_logger = root_logger.new(o!("mod" => "grpc"));
     let grpc_handle = async move {
+        let reflection = tonic_reflection::server::Builder::configure()
+            .register_encoded_file_descriptor_set(kv::FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(topic::FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(
+                tonic_health::proto::GRPC_HEALTH_V1_FILE_DESCRIPTOR_SET,
+            )
+            .build()
+            .unwrap();
+        let interceptor = crate::grpc::interceptor::RiftInterceptor::new(&grpc_logger, mm);
+
+        info!(&grpc_logger, "Listening for gRPC requests."; "addr" => cfg.grpc_addr.to_string());
         if let Err(err) = Server::builder()
-            .add_service(kv::KvServer::with_interceptor(
-                kv_impl,
-                crate::grpc::interceptor::RiftInterceptor::new(&grpc_logger, mm),
+            .add_service(kv::KvServer::with_interceptor(kv_impl, interceptor.clone()))
+            .add_service(topic::TopicServiceServer::with_interceptor(
+                topic_impl,
+                interceptor.clone(),
             ))
+            .add_service(reflection)
+            .add_service(health_service)
             .serve(cfg.grpc_addr)
             .await
         {
@@ -95,11 +117,13 @@ pub async fn run() -> ExitCode {
 
     let http_logger = root_logger.new(o!("mod" => "http"));
     let http_handle = async move {
+        info!(&http_logger, "Listening for HTTP requests."; "addr" => cfg.http_addr.to_string());
         if let Err(err) = http::listen(&cfg.http_addr).await {
             crit!(&http_logger, "Failed to listen and serve HTTP."; "error" => err.to_string());
         }
     };
 
+    info!(&root_logger, "Fully initialized and listening!");
     tokio::select! {
         _ = grpc_handle => {},
         _ = http_handle => {},

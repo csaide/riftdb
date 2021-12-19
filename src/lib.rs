@@ -21,6 +21,8 @@ pub mod http;
 pub mod log;
 /// Prometheus metrics logic and handling.
 pub mod metric;
+/// All queue logic.
+pub mod queue;
 /// Entrypoint logic for riftctl.
 pub mod riftctl;
 /// Entrypoint logic for riftd.

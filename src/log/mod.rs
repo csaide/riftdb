@@ -25,7 +25,7 @@ pub use self::level::Level;
 /// use slog::crit;
 ///
 /// let logger = librift::log::default("example", "0.1.1");
-/// crit!(logger, "default logger only logs crit level logs!");
+/// crit!(logger, "default logger only logs crit level logs!"; "hello" => "world!");
 /// ```
 pub fn default(bin: &'static str, version: &'static str) -> slog::Logger {
     let decorator = slog_term::TermDecorator::new().build();
@@ -61,7 +61,7 @@ pub fn default(bin: &'static str, version: &'static str) -> slog::Logger {
 ///     "0.1.1",
 /// );
 ///
-/// info!(logger, "Hello world!");
+/// info!(logger, "Hello world!"; "woot" => "woot");
 /// ```
 pub fn new(cfg: &config::Config, bin: &'static str, version: &'static str) -> slog::Logger {
     let drain: Box<dyn Drain<Ok = (), Err = slog::Never> + Send> = if cfg.json {
