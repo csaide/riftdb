@@ -5,3 +5,5 @@
 pub mod interceptor;
 /// The client/server/message implementation for the 'proto/kv.proto' gRPC definitions.
 pub mod kv;
+/// The topic service gRPC implementation.
+pub mod topic;

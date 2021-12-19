@@ -12,7 +12,7 @@ use tonic::{Request, Response, Status};
 
 /// The concrete implementation of the [Greeter] gRPC Server trait.
 #[derive(Debug, Default)]
-pub struct KVImpl<T>
+pub struct Handler<T>
 where
     T: crate::store::Store,
     T: Send + Sync,
@@ -20,39 +20,25 @@ where
     store: T,
 }
 
-impl<T> KVImpl<T>
+impl<T> Handler<T>
 where
     T: crate::store::Store,
     T: Send + Sync,
     T: 'static,
 {
     /// Create a new KV gRPC server.
-    pub fn new(store: T) -> KVImpl<T> {
-        KVImpl { store }
+    pub fn new(store: T) -> Handler<T> {
+        Handler { store }
     }
-}
 
-#[tonic::async_trait]
-impl<T> Kv for KVImpl<T>
-where
-    T: crate::store::Store,
-    T: Send + Sync,
-    T: 'static,
-{
-    async fn set(&self, req: Request<KeyValue>) -> Result<Response<Value>, Status> {
-        let logger = match req.extensions().get::<LoggerExt>() {
-            Some(logger_ext) => &logger_ext.logger,
-            None => unimplemented!(),
-        };
-        let resp_time = match req.extensions().get::<ResponseTimeExt>() {
-            Some(resp_time_ext) => resp_time_ext,
-            None => unimplemented!(),
-        };
+    async fn _set(&self, req: Request<KeyValue>) -> Result<Response<Value>, Status> {
+        let logger = req.extensions().get::<LoggerExt>().unwrap();
+        let resp_time = req.extensions().get::<ResponseTimeExt>().unwrap();
         defer::defer! {
             resp_time.observe()
         };
 
-        info!(logger, "Got set request!");
+        info!(logger.logger, "Got set request!");
 
         let req = req.get_ref();
         let key = Bytes::copy_from_slice(&req.key);
@@ -73,20 +59,14 @@ where
         }
     }
 
-    async fn get(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
-        let logger = match req.extensions().get::<LoggerExt>() {
-            Some(logger_ext) => &logger_ext.logger,
-            None => unimplemented!(),
-        };
-        let resp_time = match req.extensions().get::<ResponseTimeExt>() {
-            Some(resp_time_ext) => resp_time_ext,
-            None => unimplemented!(),
-        };
+    async fn _get(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
+        let logger = req.extensions().get::<LoggerExt>().unwrap();
+        let resp_time = req.extensions().get::<ResponseTimeExt>().unwrap();
         defer::defer! {
             resp_time.observe()
         };
 
-        info!(logger, "Got get request!");
+        info!(logger.logger, "Got get request!");
 
         let req = req.get_ref();
         let key = Bytes::copy_from_slice(&req.key);
@@ -105,20 +85,14 @@ where
         }
     }
 
-    async fn delete(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
-        let logger = match req.extensions().get::<LoggerExt>() {
-            Some(logger_ext) => &logger_ext.logger,
-            None => unimplemented!(),
-        };
-        let resp_time = match req.extensions().get::<ResponseTimeExt>() {
-            Some(resp_time_ext) => resp_time_ext,
-            None => unimplemented!(),
-        };
+    async fn _del(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
+        let logger = req.extensions().get::<LoggerExt>().unwrap();
+        let resp_time = req.extensions().get::<ResponseTimeExt>().unwrap();
         defer::defer! {
             resp_time.observe()
         };
 
-        info!(logger, "Got delete request!");
+        info!(logger.logger, "Got delete request!");
 
         let req = req.get_ref();
         let key = Bytes::copy_from_slice(&req.key);
@@ -135,5 +109,25 @@ where
             },
             _ => unimplemented!(),
         }
+    }
+}
+
+#[tonic::async_trait]
+impl<T> Kv for Handler<T>
+where
+    T: crate::store::Store,
+    T: Send + Sync,
+    T: 'static,
+{
+    async fn set(&self, req: Request<KeyValue>) -> Result<Response<Value>, Status> {
+        self._set(req).await
+    }
+
+    async fn get(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
+        self._get(req).await
+    }
+
+    async fn delete(&self, req: Request<Key>) -> Result<Response<Value>, Status> {
+        self._del(req).await
     }
 }
