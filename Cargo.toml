@@ -13,6 +13,7 @@ hyper = "~0.14.15"
 prometheus = "0.13"
 prost = "0.9"
 prost-types = "0.9"
+rand = "0.8.4"
 slog = { version = "2.7", features = ["nested-values"]}
 slog-async = { version = "2.7", features = ["nested-values"] }
 slog-json = { version = "2.4", features = ["nested-values"] }
