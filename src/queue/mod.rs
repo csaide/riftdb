@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 mod error;
-mod queue;
+mod lease;
 mod slot;
+mod unbounded;
 
 pub use error::{Error, Result};
-pub use queue::Queue;
-pub use slot::{Slot, SlotLease};
+pub use lease::Lease;
+pub use slot::Slot;
+pub use unbounded::UnboundedQueue;

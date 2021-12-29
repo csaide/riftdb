@@ -33,11 +33,7 @@ impl Manager {
         const_labels.insert(String::from("binary"), self.bin.clone());
         const_labels.insert(String::from("version"), self.version.clone());
 
-        let variable_labels = raw_labels
-            .to_vec()
-            .into_iter()
-            .map(|s| s.to_owned())
-            .collect();
+        let variable_labels = raw_labels.iter().map(|s| String::from(*s)).collect();
         prometheus::Opts {
             namespace: self.namespace.clone(),
             subsystem: self.subsystem.clone(),

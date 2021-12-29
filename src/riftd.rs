@@ -4,6 +4,7 @@
 use std::net::SocketAddr;
 
 use crate::grpc::kv;
+use crate::grpc::pubsub;
 use crate::grpc::topic;
 use crate::http;
 use crate::log;
@@ -79,12 +80,17 @@ pub async fn run() -> ExitCode {
     let memory = store::HashStore::new();
     let kv_impl = kv::Handler::new(memory);
     let topic_impl = topic::Handler::default();
+    let pubsub_impl = pubsub::Handler::with_capacity(1024);
+
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
         .set_service_status("", tonic_health::ServingStatus::Serving)
         .await;
     health_reporter
-        .set_service_status("kv.KV", tonic_health::ServingStatus::Serving)
+        .set_service_status("kv", tonic_health::ServingStatus::Serving)
+        .await;
+    health_reporter
+        .set_service_status("pubsub", tonic_health::ServingStatus::Serving)
         .await;
 
     let grpc_logger = root_logger.new(o!("mod" => "grpc"));
@@ -92,6 +98,7 @@ pub async fn run() -> ExitCode {
         let reflection = tonic_reflection::server::Builder::configure()
             .register_encoded_file_descriptor_set(kv::FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(topic::FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(pubsub::FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(
                 tonic_health::proto::GRPC_HEALTH_V1_FILE_DESCRIPTOR_SET,
             )
@@ -104,6 +111,10 @@ pub async fn run() -> ExitCode {
             .add_service(kv::KvServer::with_interceptor(kv_impl, interceptor.clone()))
             .add_service(topic::TopicServiceServer::with_interceptor(
                 topic_impl,
+                interceptor.clone(),
+            ))
+            .add_service(pubsub::PubSubServiceServer::with_interceptor(
+                pubsub_impl,
                 interceptor.clone(),
             ))
             .add_service(reflection)

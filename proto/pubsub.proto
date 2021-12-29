@@ -1,0 +1,75 @@
+// (c) Copyright 2021 Christian Saide
+// SPDX-License-Identifier: GPL-3.0
+
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package pubsub;
+
+// An arbitrary unit of data to transmit via a topic.
+message Message {
+    // The topic associated with this [Message].
+    string topic = 1;
+    // An arbitrary key/value set of attributes for use in routing, and tracing
+    // functionality.
+    map<string, string> attributes = 2;
+    // The timestamp of when this [Message] was created.
+    google.protobuf.Timestamp created = 3;
+    // The raw data representing the body of the message.
+    bytes data = 4;
+    // The SHA256 hash of the message.
+    bytes hash = 5;
+}
+
+// The status of a given message confirmation, when publishing messages.
+enum ConfimrationStatus {
+    // An unknown confirmation status should be considered a fatal error.
+    Unknown = 0;
+    // A committed status states that the server has guaratteed that it has safely handled
+    // the message to the best of its knowledge.
+    Committed = 1;
+}
+
+// A confirmation represents the guarantee to the publisher that a published messages has been fully
+// confirmed in the backend and commited to storage. Or it represents an errored condition and whether
+// or not to retry publish.
+message Confirmation {
+    // The status represented by this confirmation.
+    ConfimrationStatus status = 1;
+}
+
+// The subscription configuration for a subscribe request.
+message Subscription {
+    // The topic to subscribe for messages from.
+    string topic = 1;
+}
+
+// The lease associated with a given subscription's message.
+message Lease {
+    // The identifier for this message.
+    uint64 id = 1;
+    // The index of this message.
+    uint64 index = 2;
+}
+
+// A message response from an active subscription.
+message LeasedMessage {
+    // The lease associated with this message.
+    Lease lease = 1;
+    // The actual message itself.
+    Message message = 2;
+}
+
+// The PubSubService exposes functionality to publish and subscribe to messages
+// on a given topic.
+service PubSubService {
+    // Publish a message to a topic.
+    rpc Publish(Message) returns (Confirmation);
+    // Ack a lease.
+    rpc Ack(Lease) returns (Confirmation);
+    // Nack a lease.
+    rpc Nack(Lease) returns(Confirmation);
+    // Subscribe to messages on a given topic.
+    rpc Subscribe(Subscription) returns (stream LeasedMessage);
+}

@@ -8,17 +8,36 @@ use hyper::{
     service::make_service_fn, service::service_fn, Body, Method, Request, Response, Server,
     StatusCode,
 };
-use prometheus::{Encoder, TextEncoder};
+use prometheus::{Encoder, ProtobufEncoder, TextEncoder, PROTOBUF_FORMAT, TEXT_FORMAT};
 
-async fn metrics() -> Result<Response<Body>, hyper::http::Error> {
+async fn metrics(req: Request<Body>) -> Result<Response<Body>, hyper::http::Error> {
     let mut buffer = vec![];
-    let encoder = TextEncoder::new();
-    let metric_families = prometheus::gather();
 
-    match encoder.encode(&metric_families, &mut buffer) {
-        Ok(()) => Ok(Response::new(Body::from(buffer))),
-        Err(_) => server_error(),
-    }
+    let accepts_protobuf = req
+        .headers()
+        .get_all("accept")
+        .iter()
+        .any(|header| header == PROTOBUF_FORMAT);
+
+    let metric_families = prometheus::gather();
+    let content_type = if accepts_protobuf {
+        let encoder = ProtobufEncoder::new();
+        if encoder.encode(&metric_families, &mut buffer).is_err() {
+            return server_error();
+        }
+        PROTOBUF_FORMAT
+    } else {
+        let encoder = TextEncoder::new();
+        if encoder.encode(&metric_families, &mut buffer).is_err() {
+            return server_error();
+        }
+        TEXT_FORMAT
+    };
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", content_type)
+        .body(Body::from(buffer))
 }
 
 async fn ready() -> Result<Response<Body>, hyper::http::Error> {
@@ -52,7 +71,7 @@ fn not_found() -> Result<Response<Body>, hyper::http::Error> {
 
 async fn router(req: Request<Body>) -> Result<Response<Body>, hyper::http::Error> {
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/metrics") => metrics().await,
+        (&Method::GET, "/metrics") => metrics(req).await,
         (&Method::GET, "/live") => live().await,
         (&Method::GET, "/ready") => ready().await,
         _ => not_found(),

@@ -10,6 +10,7 @@ function list_files_missing_lic() {
         -not -path './.git/*' \
         -not -path './.vscode/*' \
         -not -path './.github/*' \
+        -not -path './output/*' \
         -not -path './dist/docker/development/.bashrc' \
         -not -name .gitignore \
         -not -name .dockerignore \
@@ -36,6 +37,7 @@ function list_files_missing_copy() {
         -not -path './.git/*' \
         -not -path './.vscode/*' \
         -not -path './.github/*' \
+        -not -path './output/*' \
         -not -path './dist/docker/development/.bashrc' \
         -not -name .gitignore \
         -not -name .dockerignore \

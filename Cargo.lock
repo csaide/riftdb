@@ -794,6 +794,7 @@ dependencies = [
  "exitcode",
  "futures-core",
  "hyper",
+ "lazy_static",
  "prometheus",
  "prost",
  "prost-types",
