@@ -5,9 +5,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use lazy_static::lazy_static;
-use prometheus::{register_int_counter, IntCounter, IntGauge};
+use prometheus::{register_int_counter, IntCounter, IntCounterVec, IntGauge};
 
 use super::{Result, Slot};
+
+const ACK_VALUE: &str = "ack";
+const NACK_VALUE: &str = "nack";
 
 lazy_static! {
     static ref TOTAL_MESSAGES_RECEIVED: IntCounter = register_int_counter!(
@@ -15,22 +18,23 @@ lazy_static! {
         "The total number of messages received by all const_queues."
     )
     .unwrap();
-    static ref TOTAL_MESSAGES_ACKED: IntCounter = register_int_counter!(
-        "rift_const_queue_acked_messages",
-        "The total number of messages successfuly acked by all const_queues."
+    static ref MESSAGE_RESULTS: IntCounterVec = register_int_counter_vec!(
+        "rift_const_queue_message_results",
+        "The number of handled messages by result type across all const_queues.",
+        &["result"],
     )
     .unwrap();
-    static ref TOTAL_MESSAGES_NACKED: IntCounter = register_int_counter!(
-        "rift_const_queue_nacked_messages",
-        "The total number of messages successfuly nacked by all const_queues."
+    static ref MESSAGE_LEASE_EXPIRES: IntCounter = register_int_counter!(
+        "rift_const_queue_message_lease_expires",
+        "The number of message leases that have expired across all const_queues."
     )
     .unwrap();
-    static ref TOTAL_MESSAGES_OUTSTANDING: IntGauge = register_int_gauge!(
+    static ref MESSAGES_OUTSTANDING: IntGauge = register_int_gauge!(
         "rift_const_queue_outstanding_messages",
         "The totall number of messages currently locked across all const_queues."
     )
     .unwrap();
-    static ref TOTAL_MESSAGES_PENDING: IntGauge = register_int_gauge!(
+    static ref MESSAGES_PENDING: IntGauge = register_int_gauge!(
         "rift_const_queue_pending_messages",
         "The total number of messages currently pending across all const_queues."
     )
@@ -75,8 +79,8 @@ where
         let mut slots = self.slots.lock().unwrap();
         let res = slots[index].ack(lease_id);
         if res.is_ok() {
-            TOTAL_MESSAGES_ACKED.inc();
-            TOTAL_MESSAGES_OUTSTANDING.dec();
+            MESSAGE_RESULTS.with_label_values(&[ACK_VALUE]).inc();
+            MESSAGES_OUTSTANDING.dec();
         }
         res
     }
@@ -86,9 +90,9 @@ where
         let mut slots = self.slots.lock().unwrap();
         let res = slots[index].nack(lease_id);
         if res.is_ok() {
-            TOTAL_MESSAGES_NACKED.inc();
-            TOTAL_MESSAGES_PENDING.inc();
-            TOTAL_MESSAGES_OUTSTANDING.dec();
+            MESSAGE_RESULTS.with_label_values(&[NACK_VALUE]).inc();
+            MESSAGES_PENDING.inc();
+            MESSAGES_OUTSTANDING.dec();
         }
         res
     }
@@ -107,7 +111,7 @@ where
         let res = empty.fill(msg);
         if res.is_ok() {
             TOTAL_MESSAGES_RECEIVED.inc();
-            TOTAL_MESSAGES_PENDING.inc();
+            MESSAGES_PENDING.inc();
         }
         res
     }
@@ -125,6 +129,9 @@ where
                 if next.expired().is_err() {
                     return None;
                 }
+                MESSAGE_LEASE_EXPIRES.inc();
+                MESSAGES_OUTSTANDING.dec();
+                MESSAGES_PENDING.inc();
                 (idx, next)
             }
             _ => return None,
@@ -135,8 +142,8 @@ where
             .ok()
             .map(|(lease_id, val)| (lease_id, idx, val));
         if res.is_some() {
-            TOTAL_MESSAGES_PENDING.dec();
-            TOTAL_MESSAGES_OUTSTANDING.inc();
+            MESSAGES_PENDING.dec();
+            MESSAGES_OUTSTANDING.inc();
         }
         res
     }
