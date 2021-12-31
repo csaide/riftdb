@@ -9,12 +9,12 @@ use futures_core::Stream;
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 
-use crate::queue::UnboundedQueue;
+use crate::queue::{UnboundedQueue, UnboundedStream};
 
 use super::proto::pub_sub_service_server::PubSubService;
 use super::{ConfimrationStatus, Confirmation, Lease, LeasedMessage, Message, Subscription};
 
-pub struct SubscribeStream(UnboundedQueue<Message>);
+pub struct SubscribeStream(UnboundedStream<Message>);
 
 impl Stream for SubscribeStream {
     type Item = Result<LeasedMessage, Status>;
@@ -22,8 +22,7 @@ impl Stream for SubscribeStream {
         let pinned = Pin::new(&mut self.0);
         let (tag, index, msg) = match pinned.poll_next(cx) {
             Poll::Ready(opt) if opt.is_some() => opt.unwrap(),
-            Poll::Ready(_) => return Poll::Ready(None),
-            Poll::Pending => return Poll::Pending,
+            _ => return Poll::Pending,
         };
         let lease = Lease::from_tag(tag, msg.topic.clone(), index);
         let leased_msg = LeasedMessage {
@@ -106,7 +105,7 @@ impl Handler {
         let _ = request.into_inner();
 
         let queue = self.queue.clone();
-        let stream = SubscribeStream(queue);
+        let stream = SubscribeStream(queue.into());
         Ok(Response::new(stream))
     }
 }

@@ -84,7 +84,8 @@ pub async fn run() -> ExitCode {
     let topic_impl = topic::Handler::default();
 
     let queue = UnboundedQueue::<pubsub::Message>::builder()
-        .with_capacity(1024)
+        .with_message_capacity(1024)
+        .with_subscription_capacity(1024)
         .with_ttl(Duration::from_secs(10))
         .build();
     let pubsub_impl = pubsub::Handler::with_queue(queue);

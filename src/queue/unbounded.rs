@@ -1,60 +1,27 @@
 // (c) Copyright 2021 Christian Saide
 // SPDX-License-Identifier: GPL-3.0
 
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
-use futures_core::Stream;
-use lazy_static::lazy_static;
-use prometheus::{register_int_counter, IntCounter, IntCounterVec, IntGauge};
-
-use super::{LeaseTag, Result, Slot};
-
-const ACK_VALUE: &str = "ack";
-const NACK_VALUE: &str = "nack";
-const DEFAULT_TTL: Duration = Duration::from_secs(10);
-const NO_CAPACITY: usize = 0;
-
-lazy_static! {
-    static ref TOTAL_MESSAGES_RECEIVED: IntCounter = register_int_counter!(
-        "rift_const_queue_received_messages",
-        "The total number of messages received by all const_queues."
-    )
-    .unwrap();
-    static ref MESSAGE_RESULTS: IntCounterVec = register_int_counter_vec!(
-        "rift_const_queue_message_results",
-        "The number of handled messages by result type across all const_queues.",
-        &["result"],
-    )
-    .unwrap();
-    static ref MESSAGE_LEASE_EXPIRES: IntCounter = register_int_counter!(
-        "rift_const_queue_message_lease_expires",
-        "The number of message leases that have expired across all const_queues."
-    )
-    .unwrap();
-    static ref MESSAGES_OUTSTANDING: IntGauge = register_int_gauge!(
-        "rift_const_queue_outstanding_messages",
-        "The totall number of messages currently locked across all const_queues."
-    )
-    .unwrap();
-    static ref MESSAGES_PENDING: IntGauge = register_int_gauge!(
-        "rift_const_queue_pending_messages",
-        "The total number of messages currently pending across all const_queues."
-    )
-    .unwrap();
-}
+use super::metrics::*;
+use super::{LeaseTag, Result, Slot, Waker};
 
 #[derive(Debug, Default)]
 pub struct Builder {
-    cap: Option<usize>,
+    message_cap: Option<usize>,
+    subscription_cap: Option<usize>,
     ttl: Option<Duration>,
 }
 
 impl Builder {
-    pub fn with_capacity(mut self, cap: usize) -> Self {
-        self.cap = Some(cap);
+    pub fn with_message_capacity(mut self, cap: usize) -> Self {
+        self.message_cap = Some(cap);
+        self
+    }
+
+    pub fn with_subscription_capacity(mut self, cap: usize) -> Self {
+        self.subscription_cap = Some(cap);
         self
     }
 
@@ -73,28 +40,20 @@ impl Builder {
 pub struct UnboundedQueue<T> {
     ttl: Duration,
     slots: Arc<Mutex<Vec<Slot<T>>>>,
-    wakers: Arc<Mutex<Vec<Waker>>>,
-}
-
-impl<T> Default for UnboundedQueue<T> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
+    pub(crate) waker: Arc<Mutex<Waker>>,
 }
 
 impl<T> UnboundedQueue<T> {
     fn build(builder: Builder) -> Self {
-        let slots = Vec::with_capacity(builder.cap.unwrap_or(NO_CAPACITY));
+        let slots = Vec::with_capacity(builder.message_cap.unwrap_or(NO_CAPACITY));
         let slots = Arc::new(Mutex::new(slots));
 
-        //TODO(csaide): Fix this....
-        let wakers = Vec::with_capacity(1024);
-        let wakers = Arc::new(Mutex::new(wakers));
+        let waker = Waker::with_capacity(builder.subscription_cap.unwrap_or(NO_CAPACITY));
+        let waker = Arc::new(Mutex::new(waker));
         Self {
             ttl: builder.ttl.unwrap_or(DEFAULT_TTL),
             slots,
-            wakers,
+            waker,
         }
     }
 
@@ -107,12 +66,12 @@ impl<T> UnboundedQueue<T> {
     pub fn new() -> Self {
         // Create backing store for messages.
         let slots = Arc::new(Mutex::new(Vec::new()));
-        let wakers = Arc::new(Mutex::new(Vec::new()));
+        let waker = Arc::new(Mutex::new(Waker::default()));
         // Return a new queue.
         Self {
             ttl: DEFAULT_TTL,
             slots,
-            wakers,
+            waker,
         }
     }
 }
@@ -159,11 +118,10 @@ where
         if res.is_ok() {
             TOTAL_MESSAGES_RECEIVED.inc();
             MESSAGES_PENDING.inc();
-            self.wakers
-                .lock()
-                .unwrap()
-                .drain(..)
-                .for_each(|waker| waker.wake());
+
+            // Lets wake the oldest waker, if it exists, so that it can consume
+            // this new message on the next poll.
+            self.waker.lock().unwrap().wake();
         }
         res
     }
@@ -174,18 +132,9 @@ where
         let (idx, next) = match slots
             .iter_mut()
             .enumerate()
-            .find(|(_, slot)| slot.is_filled() || slot.is_expired())
+            .find(|(_, slot)| slot.is_filled())
         {
-            Some((idx, next)) if next.is_filled() => (idx, next),
-            Some((idx, next)) if next.is_expired() => {
-                if next.expired().is_err() {
-                    return None;
-                }
-                MESSAGE_LEASE_EXPIRES.inc();
-                MESSAGES_OUTSTANDING.dec();
-                MESSAGES_PENDING.inc();
-                (idx, next)
-            }
+            Some(res) => res,
             _ => return None,
         };
 
@@ -198,26 +147,10 @@ where
     }
 }
 
-impl<T> Stream for UnboundedQueue<T>
-where
-    T: Clone,
-{
-    type Item = (LeaseTag, usize, T);
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut slots = self.slots.lock().unwrap();
-        let (index, slot) = match slots
-            .iter_mut()
-            .enumerate()
-            .find(|(_, slot)| slot.is_filled())
-        {
-            Some(res) => res,
-            None => {
-                self.wakers.lock().unwrap().push(cx.waker().clone());
-                return Poll::Pending;
-            }
-        };
-        let next = slot.lock(self.ttl).ok().map(|(tag, msg)| (tag, index, msg));
-        Poll::Ready(next)
+impl<T> Default for UnboundedQueue<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
