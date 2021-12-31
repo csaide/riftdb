@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use super::{Error, Lease, Result};
+use super::{lease::LeaseTag, Error, Lease, Result};
 
 /// A queue slot implementation.
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -115,7 +115,7 @@ where
 
     /// Lock this slots internal value, while setting a sane TTL to wait for an ack/nack. Returns
     /// an error if the slot is not currently a [Slot::Filled] variant.
-    pub fn lock(&mut self, ttl: Duration) -> Result<(u64, T)> {
+    pub fn lock(&mut self, ttl: Duration) -> Result<(LeaseTag, T)> {
         self.check_filled()?;
 
         let value = std::mem::take(self).unwrap();
@@ -205,11 +205,11 @@ mod tests {
         let res = slot.lock(Duration::from_secs(10));
         assert!(res.is_ok());
 
-        let (orig_lease_id, actual) = res.unwrap();
+        let (orig_lease_tag, actual) = res.unwrap();
         assert_eq!(val, actual);
 
         // Nack the slot which should mean we have a filled slot again.
-        let res = slot.nack(orig_lease_id);
+        let res = slot.nack(orig_lease_tag.id);
         assert!(res.is_ok());
         assert!(slot.is_filled());
 
@@ -217,12 +217,12 @@ mod tests {
         let res = slot.lock(Duration::from_secs(10));
         assert!(res.is_ok());
 
-        let (new_lease_id, actual) = res.unwrap();
+        let (new_lease_tag, actual) = res.unwrap();
         assert_eq!(val, actual);
-        assert_ne!(orig_lease_id, new_lease_id);
+        assert_ne!(orig_lease_tag, new_lease_tag);
 
         // Now ack the slot which should mean we have a empty slot.
-        let res = slot.ack(new_lease_id);
+        let res = slot.ack(new_lease_tag.id);
         assert!(res.is_ok());
         assert!(slot.is_empty());
     }

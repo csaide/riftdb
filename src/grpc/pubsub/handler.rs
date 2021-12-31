@@ -3,8 +3,10 @@
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::SystemTime;
 
 use futures_core::Stream;
+use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 
 use crate::queue::UnboundedQueue;
@@ -16,21 +18,19 @@ pub struct SubscribeStream(UnboundedQueue<Message>);
 
 impl Stream for SubscribeStream {
     type Item = Result<LeasedMessage, Status>;
-    fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.0.next() {
-            Some((id, index, msg)) => {
-                let lease = Lease {
-                    id,
-                    index: index as u64,
-                };
-                let leased = LeasedMessage {
-                    lease: Some(lease),
-                    message: Some(msg),
-                };
-                Poll::Ready(Some(Ok(leased)))
-            }
-            None => Poll::Ready(None),
-        }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let pinned = Pin::new(&mut self.0);
+        let (tag, index, msg) = match pinned.poll_next(cx) {
+            Poll::Ready(opt) if opt.is_some() => opt.unwrap(),
+            Poll::Ready(_) => return Poll::Ready(None),
+            Poll::Pending => return Poll::Pending,
+        };
+        let lease = Lease::from_tag(tag, msg.topic.clone(), index);
+        let leased_msg = LeasedMessage {
+            lease: Some(lease),
+            message: Some(msg),
+        };
+        Poll::Ready(Some(Ok(leased_msg)))
     }
 }
 
@@ -47,57 +47,56 @@ impl Handler {
         Self { queue }
     }
 
-    /// Create a new handler with a defined initial message backlog capacity.
-    pub fn with_capacity(cap: usize) -> Self {
-        let queue = UnboundedQueue::with_capacity(cap);
+    /// Create a new handler with the predefined queue.
+    pub fn with_queue(queue: UnboundedQueue<Message>) -> Self {
         Self { queue }
     }
 
     async fn _publish(&self, request: Request<Message>) -> Result<Response<Confirmation>, Status> {
-        let msg = request.into_inner();
-        let mut conf = Confirmation::default();
+        let mut msg = request.into_inner();
+        if msg.data.is_empty() {
+            return Err(Status::invalid_argument("data payload must be non-empty."));
+        }
+
+        msg.published = Some(Timestamp::from(SystemTime::now()));
+
         match self.queue.push(msg) {
-            Ok(()) => conf.status = ConfimrationStatus::Committed as i32,
-            Err(err) => {
-                return Err(Status::internal(format!(
-                    "queue is full or otherwise invalid: {}",
-                    err
-                )))
-            }
-        };
-        Ok(Response::new(conf))
+            Ok(()) => Ok(Response::new(Confirmation {
+                status: ConfimrationStatus::Committed as i32,
+            })),
+            Err(err) => Err(Status::internal(format!(
+                "queue is full or otherwise invalid: {}",
+                err
+            ))),
+        }
     }
 
     async fn _ack(&self, request: Request<Lease>) -> Result<Response<Confirmation>, Status> {
         let lease = request.into_inner();
 
-        let mut conf = Confirmation::default();
         match self.queue.ack(lease.id, lease.index as usize) {
-            Ok(()) => conf.status = ConfimrationStatus::Committed as i32,
-            Err(err) => {
-                return Err(Status::internal(format!(
-                    "queue is full or otherwise invalid: {}",
-                    err
-                )))
-            }
+            Ok(()) => Ok(Response::new(Confirmation {
+                status: ConfimrationStatus::Committed as i32,
+            })),
+            Err(err) => Err(Status::internal(format!(
+                "queue is full or otherwise invalid: {}",
+                err
+            ))),
         }
-        Ok(Response::new(conf))
     }
 
     async fn _nack(&self, request: Request<Lease>) -> Result<Response<Confirmation>, Status> {
         let lease = request.into_inner();
 
-        let mut conf = Confirmation::default();
         match self.queue.nack(lease.id, lease.index as usize) {
-            Ok(()) => conf.status = ConfimrationStatus::Committed as i32,
-            Err(err) => {
-                return Err(Status::internal(format!(
-                    "queue is full or otherwise invalid: {}",
-                    err
-                )))
-            }
+            Ok(()) => Ok(Response::new(Confirmation {
+                status: ConfimrationStatus::Committed as i32,
+            })),
+            Err(err) => Err(Status::internal(format!(
+                "queue is full or otherwise invalid: {}",
+                err
+            ))),
         }
-        Ok(Response::new(conf))
     }
 
     async fn _subscribe(

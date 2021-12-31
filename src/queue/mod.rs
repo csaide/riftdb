@@ -7,6 +7,6 @@ mod slot;
 mod unbounded;
 
 pub use error::{Error, Result};
-pub use lease::Lease;
+pub use lease::{Lease, LeaseTag};
 pub use slot::Slot;
 pub use unbounded::UnboundedQueue;

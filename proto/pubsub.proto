@@ -14,12 +14,11 @@ message Message {
     // An arbitrary key/value set of attributes for use in routing, and tracing
     // functionality.
     map<string, string> attributes = 2;
-    // The timestamp of when this [Message] was created.
-    google.protobuf.Timestamp created = 3;
+    // The timestamp of when this [Message] was published. Note that this field is ignored
+    // during publish and will be overwritten by the server when received.
+    google.protobuf.Timestamp published = 3;
     // The raw data representing the body of the message.
     bytes data = 4;
-    // The SHA256 hash of the message.
-    bytes hash = 5;
 }
 
 // The status of a given message confirmation, when publishing messages.
@@ -47,10 +46,18 @@ message Subscription {
 
 // The lease associated with a given subscription's message.
 message Lease {
-    // The identifier for this message.
-    uint64 id = 1;
+    // The topic associated with this [Lease].
+    string topic = 1;
+    // The identifier for this lease.
+    uint64 id = 2;
     // The index of this message.
-    uint64 index = 2;
+    uint64 index = 3;
+    // The ttl of this message in whole milliseconds.
+    uint64 ttl_ms = 4;
+    // The timestamp of when this lease was initially created.
+    google.protobuf.Timestamp leased = 5;
+    // The timestamp of when this lease will eventually expire, and a new lease must be made.
+    google.protobuf.Timestamp deadline = 6;
 }
 
 // A message response from an active subscription.

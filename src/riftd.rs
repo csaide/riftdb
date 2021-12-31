@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use crate::grpc::kv;
 use crate::grpc::pubsub;
@@ -9,6 +10,7 @@ use crate::grpc::topic;
 use crate::http;
 use crate::log;
 use crate::metric;
+use crate::queue::UnboundedQueue;
 use crate::store;
 
 use exitcode::ExitCode;
@@ -80,7 +82,12 @@ pub async fn run() -> ExitCode {
     let memory = store::HashStore::new();
     let kv_impl = kv::Handler::new(memory);
     let topic_impl = topic::Handler::default();
-    let pubsub_impl = pubsub::Handler::with_capacity(1024);
+
+    let queue = UnboundedQueue::<pubsub::Message>::builder()
+        .with_capacity(1024)
+        .with_ttl(Duration::from_secs(10))
+        .build();
+    let pubsub_impl = pubsub::Handler::with_queue(queue);
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
