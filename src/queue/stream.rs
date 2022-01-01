@@ -23,11 +23,7 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let next = self.queue.next();
         if next.is_none() {
-            self.queue
-                .waker
-                .lock()
-                .unwrap()
-                .register(self.id, cx.waker().clone());
+            self.queue.register_task_waker(self.id, cx.waker().clone());
             Poll::Pending
         } else {
             Poll::Ready(next)

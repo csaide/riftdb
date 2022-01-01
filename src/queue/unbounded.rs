@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use std::sync::{Arc, Mutex};
+use std::task;
 use std::time::Duration;
+
+use uuid::Uuid;
 
 use super::metrics::*;
 use super::{LeaseTag, Result, Slot, Waker};
@@ -80,6 +83,11 @@ impl<T> UnboundedQueue<T>
 where
     T: Clone,
 {
+    #[doc(hidden)]
+    pub fn register_task_waker(&self, id: Uuid, waker: task::Waker) {
+        self.waker.lock().unwrap().register(id, waker)
+    }
+
     /// Ack the given message index.
     pub fn ack(&self, lease_id: u64, index: usize) -> Result<()> {
         let mut slots = self.slots.lock().unwrap();

@@ -6,7 +6,8 @@ use std::task;
 
 use uuid::Uuid;
 
-/// A waker instance is responsible for tracking inflight future wakers waiting for new messages.
+/// A waker instance is responsible for tracking inflight stream tasks waiting for new messages. The ordering of wake events
+/// is a round robin FIFO implementation.
 #[derive(Debug, Default)]
 pub struct Waker {
     wakers: HashMap<Uuid, task::Waker>,
@@ -26,7 +27,9 @@ impl Waker {
     /// If the given ID is already registered the original waker is overwritten
     /// with the new waker.
     pub fn register(&mut self, id: Uuid, waker: task::Waker) {
+        // First insert the new waker, in all cases we want the newest waker instance by ID.
         if self.wakers.insert(id, waker).is_none() {
+            // If we have never seen this ID before, store it in the ids queue for use later.
             self.ids.push_back(id);
         }
     }
@@ -34,10 +37,14 @@ impl Waker {
     /// Wake the oldest known waker in this instance, if no wakers are registered
     /// this is effectively a no-op.
     pub fn wake(&mut self) {
+        // Grab the oldest id or short circuit if we don't have any wakers currently.
         let id = match self.ids.pop_front() {
             Some(id) => id,
             None => return,
         };
-        self.wakers.remove(&id).map(|waker| waker.wake());
+        // Pop the waker off the map and then consume it immediately by calling `wake()`.
+        if let Some(waker) = self.wakers.remove(&id) {
+            waker.wake()
+        }
     }
 }
