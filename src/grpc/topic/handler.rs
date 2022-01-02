@@ -1,20 +1,17 @@
 // (c) Copyright 2021 Christian Saide
 // SPDX-License-Identifier: GPL-3.0
 
-use super::proto::topic_service_server::TopicService;
-use super::proto::{
-    CreateTopicRequest, DeleteTopicRequest, GetTopicRequest, ListTopicRequest, Topic,
-    UpdateTopicRequest,
-};
+use crate::grpc::error::topic_not_found;
+use crate::grpc::pubsub::Message;
+use crate::topic::Registry;
 
-use std::collections::HashMap;
+use super::proto::topic_service_server::TopicService;
+use super::proto::{CreateRequest, DeleteRequest, GetRequest, ListRequest, Topic, UpdateRequest};
+
 use std::pin::Pin;
-use std::sync::RwLock;
 use std::task::{Context, Poll};
-use std::time::SystemTime;
 
 use futures_core::Stream;
-use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 
 pub struct TopicStream(Vec<Topic>);
@@ -30,97 +27,57 @@ impl Stream for TopicStream {
 /// The Topic service implementation.
 #[derive(Debug)]
 pub struct Handler {
-    topics: RwLock<HashMap<String, Topic>>,
+    topic_registry: Registry<Message>,
 }
 
 impl Handler {
-    fn new() -> Self {
-        let map = HashMap::default();
-        let topics = RwLock::new(map);
-        Handler { topics }
+    /// Create a new handler with a default registry.
+    pub fn new() -> Self {
+        let topic_registry = Registry::default();
+        Handler { topic_registry }
     }
 
-    async fn _create(
-        &self,
-        request: Request<CreateTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
-        let request = request.into_inner();
-
-        let mut topics = self.topics.write().unwrap();
-
-        if topics.contains_key(&request.name) {
-            return Err(Status::already_exists(format!(
-                "specified topic '{}' already exists",
-                request.name
-            )));
-        }
-
-        let mut topic = Topic::default();
-        let now = std::time::SystemTime::now();
-        let now = Timestamp::from(now);
-
-        topic.created = Some(now.clone());
-        topic.name = request.name.clone();
-        topic.ttl_ms = request.ttl_ms;
-        topic.updated = Some(now);
-
-        topics.insert(request.name, topic.clone());
-        Ok(Response::new(topic))
+    /// Create a new handler with a predefined registry.
+    pub fn with_registry(topic_registry: Registry<Message>) -> Self {
+        Handler { topic_registry }
     }
 
-    async fn _get(&self, request: Request<GetTopicRequest>) -> Result<Response<Topic>, Status> {
+    async fn _create(&self, request: Request<CreateRequest>) -> Result<Response<Topic>, Status> {
         let request = request.into_inner();
 
-        let topics = self.topics.read().unwrap();
-        match topics.get(&request.name) {
-            Some(topic) => Ok(Response::new(topic.clone())),
-            None => Err(Status::not_found("not found")),
+        let topic = self.topic_registry.create(request.name.clone());
+        Ok(Response::new(Topic::from_inner(request.name, topic)))
+    }
+
+    async fn _get(&self, request: Request<GetRequest>) -> Result<Response<Topic>, Status> {
+        let request = request.into_inner();
+
+        match self.topic_registry.get(&request.name) {
+            Some(topic) => Ok(Response::new(Topic::from_inner(request.name, topic))),
+            None => topic_not_found(&request.name),
         }
     }
 
-    async fn _list(
-        &self,
-        _request: Request<ListTopicRequest>,
-    ) -> Result<Response<TopicStream>, Status> {
-        let topics = self.topics.read().unwrap();
-        let topics = topics
-            .iter()
-            .map(|(_, topic)| topic.clone())
-            .collect::<Vec<Topic>>();
+    async fn _list(&self, _request: Request<ListRequest>) -> Result<Response<TopicStream>, Status> {
+        let topics = self.topic_registry.iter(|iter| {
+            iter.map(|(name, topic)| Topic::from_inner(name.clone(), topic.clone()))
+                .collect::<Vec<Topic>>()
+        });
 
         let stream = TopicStream(topics);
         Ok(Response::new(stream))
     }
 
-    async fn _update(
-        &self,
-        request: Request<UpdateTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
-        let request = request.into_inner();
-
-        let mut topics = self.topics.write().unwrap();
-
-        let now = SystemTime::now().into();
-        match topics.get_mut(&request.name) {
-            Some(topic) => {
-                topic.updated = Some(now);
-                topic.ttl_ms = request.ttl_ms;
-                Ok(Response::new(topic.clone()))
-            }
-            None => Err(Status::not_found("not found")),
-        }
+    async fn _update(&self, _request: Request<UpdateRequest>) -> Result<Response<Topic>, Status> {
+        unimplemented!()
     }
 
-    async fn _delete(
-        &self,
-        request: Request<DeleteTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
+    async fn _delete(&self, request: Request<DeleteRequest>) -> Result<Response<Topic>, Status> {
         let request = request.into_inner();
 
-        let mut topics = self.topics.write().unwrap();
-        match topics.remove(&request.name) {
-            Some(topic) => Ok(Response::new(topic)),
-            None => Err(Status::not_found("not found")),
+        match self.topic_registry.delete(&request.name) {
+            Some(topic) => Ok(Response::new(Topic::from_inner(request.name, topic))),
+            None => topic_not_found(&request.name),
         }
     }
 }
@@ -134,17 +91,14 @@ impl Default for Handler {
 #[tonic::async_trait]
 impl TopicService for Handler {
     #[inline]
-    async fn create(
-        &self,
-        request: Request<CreateTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
+    async fn create(&self, request: Request<CreateRequest>) -> Result<Response<Topic>, Status> {
         self._create(request).await
     }
 
     #[inline]
     async fn get(
         &self,
-        request: tonic::Request<GetTopicRequest>,
+        request: tonic::Request<GetRequest>,
     ) -> Result<tonic::Response<Topic>, tonic::Status> {
         self._get(request).await
     }
@@ -154,24 +108,18 @@ impl TopicService for Handler {
     #[inline]
     async fn list(
         &self,
-        request: tonic::Request<ListTopicRequest>,
+        request: tonic::Request<ListRequest>,
     ) -> Result<tonic::Response<Self::ListStream>, tonic::Status> {
         self._list(request).await
     }
 
     #[inline]
-    async fn update(
-        &self,
-        request: Request<UpdateTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
+    async fn update(&self, request: Request<UpdateRequest>) -> Result<Response<Topic>, Status> {
         self._update(request).await
     }
 
     #[inline]
-    async fn delete(
-        &self,
-        request: Request<DeleteTopicRequest>,
-    ) -> Result<Response<Topic>, Status> {
+    async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<Topic>, Status> {
         self._delete(request).await
     }
 }

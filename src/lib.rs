@@ -11,8 +11,6 @@ extern crate slog;
 #[macro_use]
 extern crate prometheus;
 
-/// Defers for handling cleanup.
-pub mod defer;
 /// The main gRPC server/client implementations.
 pub mod grpc;
 /// Debugging/Control Plane HTTP handling.
@@ -27,5 +25,7 @@ pub mod queue;
 pub mod riftctl;
 /// Entrypoint logic for riftd.
 pub mod riftd;
-/// The main backend store implementations.
-pub mod store;
+/// Topic subscription handling.
+pub mod subscription;
+/// Topic handling.
+pub mod topic;

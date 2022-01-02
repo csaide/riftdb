@@ -9,22 +9,27 @@ use futures_core::Stream;
 use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 
-use crate::queue::{UnboundedQueue, UnboundedStream};
+use crate::grpc::error::{sub_not_found, topic_not_found};
+use crate::queue::UnboundedStream;
+use crate::topic::Registry;
 
 use super::proto::pub_sub_service_server::PubSubService;
 use super::{ConfimrationStatus, Confirmation, Lease, LeasedMessage, Message, Subscription};
 
-pub struct SubscribeStream(UnboundedStream<Message>);
+pub struct SubscribeStream {
+    inner: UnboundedStream<Message>,
+    subscription: String,
+}
 
 impl Stream for SubscribeStream {
     type Item = Result<LeasedMessage, Status>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let pinned = Pin::new(&mut self.0);
+        let pinned = Pin::new(&mut self.inner);
         let (tag, index, msg) = match pinned.poll_next(cx) {
             Poll::Ready(opt) if opt.is_some() => opt.unwrap(),
             _ => return Poll::Pending,
         };
-        let lease = Lease::from_tag(tag, msg.topic.clone(), index);
+        let lease = Lease::from_tag(tag, msg.topic.clone(), self.subscription.clone(), index);
         let leased_msg = LeasedMessage {
             lease: Some(lease),
             message: Some(msg),
@@ -36,19 +41,19 @@ impl Stream for SubscribeStream {
 /// The concrete server handler for the pubsub service.
 #[derive(Debug)]
 pub struct Handler {
-    queue: UnboundedQueue<Message>,
+    topic_registry: Registry<Message>,
 }
 
 impl Handler {
     /// Create a new handler with no defined capacity. This is synonymous with `default()`.
     pub fn new() -> Self {
-        let queue = UnboundedQueue::default();
-        Self { queue }
+        let topic_registry = Registry::default();
+        Self { topic_registry }
     }
 
-    /// Create a new handler with the predefined queue.
-    pub fn with_queue(queue: UnboundedQueue<Message>) -> Self {
-        Self { queue }
+    /// Create a new handler with the supplied topic registry.
+    pub fn with_registry(topic_registry: Registry<Message>) -> Self {
+        Self { topic_registry }
     }
 
     async fn _publish(&self, request: Request<Message>) -> Result<Response<Confirmation>, Status> {
@@ -56,10 +61,18 @@ impl Handler {
         if msg.data.is_empty() {
             return Err(Status::invalid_argument("data payload must be non-empty."));
         }
+        if msg.topic.is_empty() {
+            return Err(Status::invalid_argument("topic name must be non-empty"));
+        }
+
+        let topic = match self.topic_registry.get(&msg.topic) {
+            Some(topic) => topic,
+            None => return topic_not_found(&msg.topic),
+        };
 
         msg.published = Some(Timestamp::from(SystemTime::now()));
 
-        match self.queue.push(msg) {
+        match topic.push(msg) {
             Ok(()) => Ok(Response::new(Confirmation {
                 status: ConfimrationStatus::Committed as i32,
             })),
@@ -73,7 +86,16 @@ impl Handler {
     async fn _ack(&self, request: Request<Lease>) -> Result<Response<Confirmation>, Status> {
         let lease = request.into_inner();
 
-        match self.queue.ack(lease.id, lease.index as usize) {
+        let topic = match self.topic_registry.get(&lease.topic) {
+            Some(topic) => topic,
+            None => return topic_not_found(&lease.topic),
+        };
+        let sub = match topic.get(&lease.subscription) {
+            Some(sub) => sub,
+            None => return sub_not_found(&lease.subscription, &lease.topic),
+        };
+
+        match sub.queue.ack(lease.id, lease.index as usize) {
             Ok(()) => Ok(Response::new(Confirmation {
                 status: ConfimrationStatus::Committed as i32,
             })),
@@ -87,7 +109,16 @@ impl Handler {
     async fn _nack(&self, request: Request<Lease>) -> Result<Response<Confirmation>, Status> {
         let lease = request.into_inner();
 
-        match self.queue.nack(lease.id, lease.index as usize) {
+        let topic = match self.topic_registry.get(&lease.topic) {
+            Some(topic) => topic,
+            None => return topic_not_found(&lease.topic),
+        };
+        let sub = match topic.get(&lease.subscription) {
+            Some(sub) => sub,
+            None => return sub_not_found(&lease.subscription, &lease.topic),
+        };
+
+        match sub.queue.nack(lease.id, lease.index as usize) {
             Ok(()) => Ok(Response::new(Confirmation {
                 status: ConfimrationStatus::Committed as i32,
             })),
@@ -102,10 +133,21 @@ impl Handler {
         &self,
         request: Request<Subscription>,
     ) -> Result<Response<SubscribeStream>, Status> {
-        let _ = request.into_inner();
+        let subscription = request.into_inner();
 
-        let queue = self.queue.clone();
-        let stream = SubscribeStream(queue.into());
+        let topic = match self.topic_registry.get(&subscription.topic) {
+            Some(topic) => topic,
+            None => return topic_not_found(&subscription.topic),
+        };
+        let sub = match topic.get(&subscription.name) {
+            Some(sub) => sub,
+            None => return sub_not_found(&subscription.name, &subscription.topic),
+        };
+
+        let stream = SubscribeStream {
+            inner: sub.queue.into(),
+            subscription: subscription.name,
+        };
         Ok(Response::new(stream))
     }
 }

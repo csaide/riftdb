@@ -11,8 +11,6 @@ package topic;
 message Topic {
     // The name of this message topic.
     string name = 1;
-    // The maximum lifetime of a message in this topic.
-    uint64 ttl_ms = 2;
     // The timestamp of when this [Value] was created.
     google.protobuf.Timestamp created = 3;
     // The timestamp of when this [Value] was last updated.
@@ -20,51 +18,47 @@ message Topic {
 }
 
 // Describes a create topic request.
-message CreateTopicRequest {
+message CreateRequest {
     // The name of the topic to create.
     string name = 1;
-    // The maximum lifetime of a message in the newly created topic.
-    uint64 ttl_ms = 2;
 }
 
 // Describes a get topic request.
-message GetTopicRequest {
+message GetRequest {
     // The name of the message topic to retrieve.
     string name = 1;
 }
 
 // Describes a list topic request.
-message ListTopicRequest {}
+message ListRequest {}
 
 // Describes a delete topic request.
-message DeleteTopicRequest {
+message DeleteRequest {
     // The name of the message topic to delete.
     string name = 1;
 }
 
-// Descrives a update topic request.
-message UpdateTopicRequest {
-    // The name of this message topic.
+// Describes an update topic request.
+message UpdateRequest {
+    // The name of the message topic to update.
     string name = 1;
-    // The maximum lifetime of a message in this topic.
-    uint64 ttl_ms = 2;
 }
 
 // The TopicService exposes Topic management functionality.
 service TopicService {
     // Create a new topic based on the supplied configuration. The newly created
     // topic is then returned to the caller for later user.
-    rpc Create (CreateTopicRequest) returns (Topic);
+    rpc Create (CreateRequest) returns (Topic);
 
     // Get the specified topic.
-    rpc Get (GetTopicRequest) returns (Topic);
+    rpc Get (GetRequest) returns (Topic);
 
     // List the filtered list of topics.
-    rpc List (ListTopicRequest) returns (stream Topic);
+    rpc List (ListRequest) returns (stream Topic);
 
     // Update a given topic based on the supplied configuration.
-    rpc Update (UpdateTopicRequest) returns (Topic);
+    rpc Update (UpdateRequest) returns (Topic);
 
     // Delete the specified queue fully releasing all resources associated with it.
-    rpc Delete (DeleteTopicRequest) returns (Topic);
+    rpc Delete (DeleteRequest) returns (Topic);
 }

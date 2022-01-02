@@ -40,24 +40,28 @@ message Confirmation {
 
 // The subscription configuration for a subscribe request.
 message Subscription {
+    // The name for this subscription.
+    string name = 1;
     // The topic to subscribe for messages from.
-    string topic = 1;
+    string topic = 2;
 }
 
 // The lease associated with a given subscription's message.
 message Lease {
     // The topic associated with this [Lease].
     string topic = 1;
+    // The subscription associated with this [Lease].
+    string subscription = 2;
     // The identifier for this lease.
-    uint64 id = 2;
+    uint64 id = 3;
     // The index of this message.
-    uint64 index = 3;
+    uint64 index = 4;
     // The ttl of this message in whole milliseconds.
-    uint64 ttl_ms = 4;
+    uint64 ttl_ms = 5;
     // The timestamp of when this lease was initially created.
-    google.protobuf.Timestamp leased = 5;
+    google.protobuf.Timestamp leased = 6;
     // The timestamp of when this lease will eventually expire, and a new lease must be made.
-    google.protobuf.Timestamp deadline = 6;
+    google.protobuf.Timestamp deadline = 7;
 }
 
 // A message response from an active subscription.

@@ -10,9 +10,10 @@ mod proto {
 
     impl Lease {
         /// Generate a new lease from a [LeaseTag].
-        pub fn from_tag(tag: LeaseTag, topic: String, index: usize) -> Self {
+        pub fn from_tag(tag: LeaseTag, topic: String, subscription: String, index: usize) -> Self {
             Lease {
                 topic,
+                subscription,
                 id: tag.id,
                 index: index as u64,
                 ttl_ms: tag.ttl.as_millis() as u64,

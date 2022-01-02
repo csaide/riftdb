@@ -1,0 +1,77 @@
+// (c) Copyright 2021 Christian Saide
+// SPDX-License-Identifier: GPL-3.0
+
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package subscription;
+
+// A message subscriptions subscription.
+message Subscription {
+    // The name of this message subscriptions.
+    string name = 1;
+    // The name of the topic to subscribe to.
+    string topic = 2;
+    // The timestamp of when this [Value] was created.
+    google.protobuf.Timestamp created = 3;
+    // The timestamp of when this [Value] was last updated.
+    google.protobuf.Timestamp updated = 4;
+}
+
+// Describes a create subscriptions request.
+message CreateRequest {
+    // The name of the subscriptions to create.
+    string name = 1;
+    // The name of the topic to subscribe to.
+    string topic = 2;
+}
+
+// Describes a get subscriptions request.
+message GetRequest {
+    // The name of the message subscriptions to retrieve.
+    string name = 1;
+    // The name of the topic to subscribe to.
+    string topic = 2;
+}
+
+// Describes a list subscriptions request.
+message ListRequest {
+    // The name of the topic to list the subscriptions from.
+    string topic = 1;
+}
+
+// Describes a delete subscriptions request.
+message DeleteRequest {
+    // The name of the message subscriptions to delete.
+    string name = 1;
+    // The name of the topic to subscribe to.
+    string topic = 2;
+}
+
+// Describes an update subscriptions request.
+message UpdateRequest {
+    // The name of the message subscriptions to update.
+    string name = 1;
+    // The name of the topic to subscribe to.
+    string topic = 2;
+}
+
+// The SubscriptionService exposes Subscription management functionality.
+service SubscriptionService {
+    // Create a new subscriptions based on the supplied configuration. The newly created
+    // subscriptions is then returned to the caller for later user.
+    rpc Create (CreateRequest) returns (Subscription);
+
+    // Get the specified subscriptions.
+    rpc Get (GetRequest) returns (Subscription);
+
+    // List the filtered list of subscriptionss.
+    rpc List (ListRequest) returns (stream Subscription);
+
+    // Update a given subscriptions based on the supplied configuration.
+    rpc Update (UpdateRequest) returns (Subscription);
+
+    // Delete the specified queue fully releasing all resources associated with it.
+    rpc Delete (DeleteRequest) returns (Subscription);
+}
