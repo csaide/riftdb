@@ -3,7 +3,7 @@
 
 use crate::grpc::error::{sub_not_found, topic_not_found};
 use crate::grpc::pubsub::Message;
-use crate::topic::Registry;
+use crate::pubsub::Registry;
 
 use super::proto::subscription_service_server::SubscriptionService;
 use super::proto::{

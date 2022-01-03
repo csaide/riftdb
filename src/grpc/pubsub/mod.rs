@@ -4,7 +4,7 @@
 mod proto {
     use prost_types::Timestamp;
 
-    use crate::queue::LeaseTag;
+    use crate::pubsub::LeaseTag;
 
     tonic::include_proto!("pubsub");
 

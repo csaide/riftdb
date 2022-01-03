@@ -9,7 +9,7 @@ use crate::grpc::topic;
 use crate::http;
 use crate::log;
 use crate::metric;
-use crate::topic::Registry;
+use crate::pubsub::Registry;
 
 use exitcode::ExitCode;
 use structopt::clap::{self, crate_version, ErrorKind};

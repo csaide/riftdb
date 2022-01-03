@@ -7,47 +7,55 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use super::metrics::*;
 use super::{LeaseTag, Result, Slot, Waker};
 
+pub const DEFAULT_TTL: Duration = Duration::from_secs(10);
+pub const NO_CAPACITY: usize = 0;
+
+/// The queue builder enables simple setting of various configuraiton options
+/// on a [Queue] instance.
 #[derive(Debug, Default)]
-pub struct Builder {
+pub struct QueueBuilder {
     message_cap: Option<usize>,
     subscription_cap: Option<usize>,
     ttl: Option<Duration>,
 }
 
-impl Builder {
+impl QueueBuilder {
+    /// Set the initial message capacity of the [Queue].
     pub fn with_message_capacity(mut self, cap: usize) -> Self {
         self.message_cap = Some(cap);
         self
     }
 
+    /// Set the initial subscription capacity of the [Queue].
     pub fn with_subscription_capacity(mut self, cap: usize) -> Self {
         self.subscription_cap = Some(cap);
         self
     }
 
+    /// Set the message ttl of the [Queue].
     pub fn with_ttl(mut self, ttl: Duration) -> Self {
         self.ttl = Some(ttl);
         self
     }
 
-    pub fn build<T>(self) -> UnboundedQueue<T> {
-        UnboundedQueue::build(self)
+    /// Build the resulting [Queue].
+    pub fn build<T>(self) -> Queue<T> {
+        Queue::build(self)
     }
 }
 
-/// A basic queue implementation based on a const sized backing buffer.
+/// A basic queue implementation.
 #[derive(Debug, Clone)]
-pub struct UnboundedQueue<T> {
+pub struct Queue<T> {
     ttl: Duration,
     slots: Arc<Mutex<Vec<Slot<T>>>>,
     pub(crate) waker: Arc<Mutex<Waker>>,
 }
 
-impl<T> UnboundedQueue<T> {
-    fn build(builder: Builder) -> Self {
+impl<T> Queue<T> {
+    fn build(builder: QueueBuilder) -> Self {
         let slots = Vec::with_capacity(builder.message_cap.unwrap_or(NO_CAPACITY));
         let slots = Arc::new(Mutex::new(slots));
 
@@ -61,8 +69,8 @@ impl<T> UnboundedQueue<T> {
     }
 
     /// Create a new builder to define the various options for the unbounded queue instance.
-    pub fn builder() -> Builder {
-        Builder::default()
+    pub fn builder() -> QueueBuilder {
+        QueueBuilder::default()
     }
 
     /// Create a new unbounded queue with no defined capacity and a default lease TTL of 10s.
@@ -79,7 +87,7 @@ impl<T> UnboundedQueue<T> {
     }
 }
 
-impl<T> UnboundedQueue<T>
+impl<T> Queue<T>
 where
     T: Clone,
 {
@@ -93,8 +101,8 @@ where
         let mut slots = self.slots.lock().unwrap();
         let res = slots[index].ack(lease_id);
         if res.is_ok() {
-            MESSAGE_RESULTS.with_label_values(&[ACK_VALUE]).inc();
-            MESSAGES_OUTSTANDING.dec();
+            // MESSAGE_RESULTS.with_label_values(&[ACK_VALUE]).inc();
+            // MESSAGES_OUTSTANDING.dec();
         }
         res
     }
@@ -104,9 +112,9 @@ where
         let mut slots = self.slots.lock().unwrap();
         let res = slots[index].nack(lease_id);
         if res.is_ok() {
-            MESSAGE_RESULTS.with_label_values(&[NACK_VALUE]).inc();
-            MESSAGES_PENDING.inc();
-            MESSAGES_OUTSTANDING.dec();
+            // MESSAGE_RESULTS.with_label_values(&[NACK_VALUE]).inc();
+            // MESSAGES_PENDING.inc();
+            // MESSAGES_OUTSTANDING.dec();
         }
         res
     }
@@ -124,8 +132,8 @@ where
 
         let res = empty.fill(msg);
         if res.is_ok() {
-            TOTAL_MESSAGES_RECEIVED.inc();
-            MESSAGES_PENDING.inc();
+            // TOTAL_MESSAGES_RECEIVED.inc();
+            // MESSAGES_PENDING.inc();
 
             // Lets wake the oldest waker, if it exists, so that it can consume
             // this new message on the next poll.
@@ -148,14 +156,14 @@ where
 
         let res = next.lock(self.ttl).ok().map(|(tag, val)| (tag, idx, val));
         if res.is_some() {
-            MESSAGES_PENDING.dec();
-            MESSAGES_OUTSTANDING.inc();
+            // MESSAGES_PENDING.dec();
+            // MESSAGES_OUTSTANDING.inc();
         }
         res
     }
 }
 
-impl<T> Default for UnboundedQueue<T> {
+impl<T> Default for Queue<T> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -169,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_queue() {
-        let queue = UnboundedQueue::<usize>::default();
+        let queue = Queue::<usize>::default();
 
         let msg = 1000 as usize;
         queue.push(msg).unwrap();

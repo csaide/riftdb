@@ -8,11 +8,7 @@ mod proto {
 
     impl Subscription {
         /// Create a subscription based on the supplied name, topic association, and inner subscription.
-        pub fn from_inner<T>(
-            name: String,
-            topic: String,
-            i: crate::subscription::Subscription<T>,
-        ) -> Self {
+        pub fn from_inner<T>(name: String, topic: String, i: crate::pubsub::Sub<T>) -> Self {
             Self {
                 created: Some(Timestamp::from(i.created)),
                 name,

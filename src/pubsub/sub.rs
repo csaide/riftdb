@@ -3,22 +3,22 @@
 
 use std::time::SystemTime;
 
-use crate::queue::UnboundedQueue;
+use super::Queue;
 
 /// A subscription represents a single consumer of a given topic.
 #[derive(Debug, Clone)]
-pub struct Subscription<T> {
+pub struct Sub<T> {
     /// The last time this particular topic was updated.
     pub updated: Option<SystemTime>,
     /// The datetime when this Topic was created.
     pub created: SystemTime,
     /// The backing persistent queue for this subscription.
-    pub queue: UnboundedQueue<T>,
+    pub queue: Queue<T>,
 }
 
-impl<T> Subscription<T> {
+impl<T> Sub<T> {
     /// Create a new subscription with a predefined backing queue.
-    pub fn with_queue(queue: UnboundedQueue<T>) -> Self {
+    pub fn with_queue(queue: Queue<T>) -> Self {
         Self {
             updated: None,
             created: SystemTime::now(),
@@ -27,7 +27,7 @@ impl<T> Subscription<T> {
     }
 }
 
-impl<T> Default for Subscription<T> {
+impl<T> Default for Sub<T> {
     fn default() -> Self {
         Self {
             created: SystemTime::now(),

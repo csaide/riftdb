@@ -10,8 +10,7 @@ use prost_types::Timestamp;
 use tonic::{Request, Response, Status};
 
 use crate::grpc::error::{sub_not_found, topic_not_found};
-use crate::queue::UnboundedStream;
-use crate::topic::Registry;
+use crate::pubsub::{Registry, UnboundedStream};
 
 use super::proto::pub_sub_service_server::PubSubService;
 use super::{ConfimrationStatus, Confirmation, Lease, LeasedMessage, Message, Subscription};

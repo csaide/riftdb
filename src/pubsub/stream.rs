@@ -7,12 +7,12 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use uuid::Uuid;
 
-use super::{LeaseTag, UnboundedQueue};
+use super::{LeaseTag, Queue};
 
-/// A wrapper around [UnboundedQueue] implementing [futures_core::Stream].
+/// A wrapper around [Queue] implementing [futures_core::Stream].
 pub struct UnboundedStream<T> {
     id: Uuid,
-    queue: UnboundedQueue<T>,
+    queue: Queue<T>,
 }
 
 impl<T> Stream for UnboundedStream<T>
@@ -31,11 +31,11 @@ where
     }
 }
 
-impl<T> From<UnboundedQueue<T>> for UnboundedStream<T>
+impl<T> From<Queue<T>> for UnboundedStream<T>
 where
     T: Clone,
 {
-    fn from(queue: UnboundedQueue<T>) -> Self {
+    fn from(queue: Queue<T>) -> Self {
         Self {
             id: Uuid::new_v4(),
             queue,

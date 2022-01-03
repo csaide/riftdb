@@ -8,7 +8,7 @@ mod proto {
 
     impl Topic {
         /// Create a new topic from the supplied topic name and inner topic.
-        pub fn from_inner<T>(name: String, i: crate::topic::Topic<T>) -> Self {
+        pub fn from_inner<T>(name: String, i: crate::pubsub::Topic<T>) -> Self {
             Self {
                 updated: i.updated.map(Timestamp::from),
                 created: Some(Timestamp::from(i.created)),

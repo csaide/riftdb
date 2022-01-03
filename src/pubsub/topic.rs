@@ -8,7 +8,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{queue::UnboundedQueue, subscription::Subscription};
+use super::{Queue, Sub};
 
 /// A topic represents a configured data flow through the rift system.
 #[derive(Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct Topic<T> {
     pub updated: Option<SystemTime>,
     /// The datetime when this Topic was created.
     pub created: SystemTime,
-    subscriptions: Arc<RwLock<HashMap<String, Subscription<T>>>>,
+    subscriptions: Arc<RwLock<HashMap<String, Sub<T>>>>,
 }
 
 impl<T> Topic<T>
@@ -46,28 +46,28 @@ where
     }
 
     /// Create a new subscription within this topic.
-    pub fn create(&self, name: String) -> Subscription<T> {
+    pub fn create(&self, name: String) -> Sub<T> {
         let mut subs = self.subscriptions.write().unwrap();
 
         if let Some(sub) = subs.get(&name) {
             return sub.clone();
         }
 
-        let queue = UnboundedQueue::<T>::builder().build();
-        let sub = Subscription::with_queue(queue);
+        let queue = Queue::<T>::builder().build();
+        let sub = Sub::with_queue(queue);
         subs.insert(name, sub.clone());
         sub
     }
 
     /// Remove the supplied subscription if it exists.
-    pub fn remove(&self, name: &str) -> Option<Subscription<T>> {
+    pub fn remove(&self, name: &str) -> Option<Sub<T>> {
         let mut subs = self.subscriptions.write().unwrap();
         subs.remove(name)
     }
 
     /// Retrieve the specified subscription if it exists, otherwise returning
     /// [None].
-    pub fn get(&self, name: &str) -> Option<Subscription<T>> {
+    pub fn get(&self, name: &str) -> Option<Sub<T>> {
         let subs = self.subscriptions.read().unwrap();
         subs.get(name).cloned()
     }
@@ -85,7 +85,7 @@ where
 
     /// Iterate over the topics contained in this registry. The supplied FnOnce is used to ensure
     /// the inner state is not mutated while iterating.
-    pub fn iter<R>(&self, func: impl FnOnce(Iter<'_, String, Subscription<T>>) -> R) -> R {
+    pub fn iter<R>(&self, func: impl FnOnce(Iter<'_, String, Sub<T>>) -> R) -> R {
         let guard = self.subscriptions.read().unwrap();
         func(guard.iter())
     }

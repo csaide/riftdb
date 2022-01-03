@@ -3,15 +3,20 @@
 
 mod error;
 mod lease;
-mod metrics;
+mod queue;
+mod registry;
 mod slot;
 mod stream;
-mod unbounded;
+mod sub;
+mod topic;
 mod waker;
 
 pub use error::{Error, Result};
 pub use lease::{Lease, LeaseTag};
+pub use queue::{Queue, QueueBuilder};
+pub use registry::Registry;
 pub use slot::Slot;
 pub use stream::UnboundedStream;
-pub use unbounded::UnboundedQueue;
+pub use sub::Sub;
+pub use topic::Topic;
 pub use waker::Waker;
