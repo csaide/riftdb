@@ -18,3 +18,32 @@ pub fn sub_not_found<T>(subscription: &str, topic: &str) -> Result<Response<T>, 
         subscription, topic
     )));
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use tonic::Code;
+
+    use super::*;
+
+    #[test]
+    fn test_topic_not_found() {
+        let err = topic_not_found::<usize>("woot");
+        assert!(err.is_err());
+        let err = err.unwrap_err();
+        assert_eq!(err.message(), "the supplied topic 'woot' does not exist");
+        assert_eq!(err.code(), Code::NotFound);
+    }
+
+    #[test]
+    fn test_sub_not_found() {
+        let err = sub_not_found::<usize>("woot", "testing");
+        assert!(err.is_err());
+        let err = err.unwrap_err();
+        assert_eq!(
+            err.message(),
+            "the supplied subscription 'woot' is not assoicated with the given topic 'testing'"
+        );
+        assert_eq!(err.code(), Code::NotFound);
+    }
+}

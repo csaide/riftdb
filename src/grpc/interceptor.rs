@@ -85,3 +85,33 @@ impl Interceptor for RiftInterceptor {
         Ok(req)
     }
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interceptor() {
+        let logger = slog::Logger::root(slog::Discard {}, o!());
+        let mm = Manager::new(
+            String::from("test"),
+            String::from("test"),
+            String::from("test"),
+            String::from("test"),
+        );
+        let mut interceptor = RiftInterceptor::new(&logger, mm);
+
+        let req = Request::new(());
+        let res = interceptor.call(req);
+        assert!(res.is_ok());
+
+        let res = res.unwrap();
+        let ext = res.extensions().get::<LoggerExt>();
+        assert!(ext.is_some());
+        let ext = res.extensions().get::<ResponseTimeExt>();
+        assert!(ext.is_some());
+        let ext = ext.unwrap();
+        ext.observe();
+    }
+}

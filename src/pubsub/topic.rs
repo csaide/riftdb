@@ -91,11 +91,63 @@ where
     }
 }
 
-impl<T> Default for Topic<T> {
+impl<T> Default for Topic<T>
+where
+    T: Clone,
+{
+    #[inline]
     fn default() -> Self {
-        Self {
-            created: SystemTime::now(),
-            ..Default::default()
-        }
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_topic() {
+        let default_topic = Topic::<u32>::default();
+        assert!(SystemTime::now().ge(&default_topic.created));
+        assert!(default_topic.updated.is_none());
+
+        let topic = Topic::<u32>::with_capacity(1024);
+
+        let first = String::from("first");
+        let second = String::from("second");
+
+        let first_sub = topic.create(first.clone());
+        let second_sub = topic.create(first.clone());
+        assert_eq!(first_sub.created, second_sub.created);
+
+        let third_sub = topic.create(second.clone());
+        assert_ne!(first_sub.created, third_sub.created);
+
+        let actual = topic.get(&first);
+        assert!(actual.is_some());
+
+        let actual = actual.unwrap();
+        assert_eq!(first_sub.created, actual.created);
+
+        let count = topic.iter(|iter| iter.count());
+        assert_eq!(count, 2);
+
+        let removed = topic.remove(&second);
+        assert!(removed.is_some());
+        let removed = removed.unwrap();
+        assert_eq!(third_sub.created, removed.created);
+
+        let count = topic.iter(|iter| iter.count());
+        assert_eq!(count, 1);
+
+        assert!(topic.push(0).is_ok());
+
+        let removed = topic.remove(&first);
+        assert!(removed.is_some());
+        let removed = removed.unwrap();
+        assert_eq!(first_sub.created, removed.created);
+
+        assert!(topic.push(0).is_err());
     }
 }

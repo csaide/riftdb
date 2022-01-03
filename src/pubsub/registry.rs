@@ -61,3 +61,41 @@ where
         func(guard.iter())
     }
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_registry_happy_path() {
+        let reg = Registry::<usize>::with_capacity(1);
+
+        let topic_name = "test".to_string();
+        let new_topic_name = "woot".to_string();
+
+        let first_topic = reg.create(topic_name.clone());
+        let second_topic = reg.create(topic_name.clone());
+        assert_eq!(first_topic.created, second_topic.created);
+
+        let actual = reg.get(&topic_name);
+        assert!(actual.is_some());
+
+        let actual = actual.unwrap();
+        assert_eq!(first_topic.created, actual.created);
+
+        let new_topic = reg.create(new_topic_name.clone());
+        assert_ne!(first_topic.created, new_topic.created);
+
+        let count = reg.iter(|iter| iter.count());
+        assert_eq!(count, 2);
+
+        let deleted = reg.delete(&new_topic_name);
+        assert!(deleted.is_some());
+        let deleted = deleted.unwrap();
+        assert_eq!(new_topic.created, deleted.created);
+
+        let count = reg.iter(|iter| iter.count());
+        assert_eq!(count, 1);
+    }
+}

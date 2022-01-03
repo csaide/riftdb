@@ -72,3 +72,22 @@ impl<T> Lease<T> {
         self.id == o
     }
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lease_happy_path() {
+        let ttl = Duration::from_millis(10);
+        let inner = "hello world!";
+        let (tag, lease) = Lease::new(ttl, inner);
+        assert!(!lease.expired());
+        assert!(lease.valid(tag.id));
+        let actual = lease.into_inner();
+        assert_eq!(inner, actual);
+        std::thread::sleep(ttl);
+        assert!(lease.expired());
+    }
+}

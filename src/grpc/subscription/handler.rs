@@ -13,7 +13,7 @@ use super::proto::{
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_core::Stream;
+use futures::Stream;
 use tonic::{Request, Response, Status};
 
 pub struct SubscriptionStream(Vec<Subscription>);
@@ -36,12 +36,17 @@ impl Handler {
     /// Create a new handler with a default registry.
     pub fn new() -> Self {
         let topic_registry = Registry::default();
-        Handler { topic_registry }
+        Handler::with_registry(topic_registry)
     }
 
     /// Create a new handler with a predefined registry.
     pub fn with_registry(topic_registry: Registry<Message>) -> Self {
         Handler { topic_registry }
+    }
+
+    #[cfg(test)]
+    fn get_registry(&self) -> &Registry<Message> {
+        &self.topic_registry
     }
 
     async fn _create(
@@ -85,10 +90,17 @@ impl Handler {
         };
 
         let subscriptions = topic.iter(|iter| {
-            iter.map(|(name, subscription)| {
-                Subscription::from_inner(name.clone(), request.topic.clone(), subscription.clone())
-            })
-            .collect::<Vec<Subscription>>()
+            let mut subs = iter
+                .map(|(name, subscription)| {
+                    Subscription::from_inner(
+                        name.clone(),
+                        request.topic.clone(),
+                        subscription.clone(),
+                    )
+                })
+                .collect::<Vec<Subscription>>();
+            subs.sort_by_key(|k| k.name.clone());
+            subs
         });
 
         let stream = SubscriptionStream(subscriptions);
@@ -171,5 +183,229 @@ impl SubscriptionService for Handler {
         request: Request<DeleteRequest>,
     ) -> Result<Response<Subscription>, Status> {
         self._delete(request).await
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    macro_rules! aw {
+        ($e:expr) => {
+            tokio_test::block_on($e)
+        };
+    }
+
+    #[test]
+    fn test_create() {
+        let handler = Handler::default();
+        let topic_name = String::from("topic");
+        let sub_name = String::from("first");
+        let second_sub_name = String::from("second");
+
+        let reg = handler.get_registry();
+        reg.create(topic_name.clone());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let res = res.get_ref();
+        assert_eq!(res.name, sub_name);
+        assert_eq!(res.topic, topic_name);
+
+        let create_req = CreateRequest {
+            topic: String::from("nope"),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_err());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: second_sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let res = res.get_ref();
+        assert_eq!(res.name, second_sub_name);
+        assert_eq!(res.topic, topic_name);
+    }
+
+    #[test]
+    fn test_delete() {
+        let topic_name = String::from("topic");
+        let sub_name = String::from("first");
+
+        let handler = Handler::default();
+
+        let reg = handler.get_registry();
+        reg.create(topic_name.clone());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+
+        let delete_req = DeleteRequest {
+            topic: String::from("nope"),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(delete_req);
+        let res = aw!(handler.delete(req));
+        assert!(res.is_err());
+
+        let delete_req = DeleteRequest {
+            topic: topic_name.clone(),
+            name: String::from("nope"),
+        };
+        let req = Request::new(delete_req);
+        let res = aw!(handler.delete(req));
+        assert!(res.is_err());
+
+        let delete_req = DeleteRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(delete_req);
+        let res = aw!(handler.delete(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let res = res.get_ref();
+        assert_eq!(res.name, sub_name);
+        assert_eq!(res.topic, topic_name);
+    }
+
+    #[test]
+    fn test_get_request() {
+        let topic_name = String::from("topic");
+        let sub_name = String::from("first");
+
+        let handler = Handler::default();
+
+        let reg = handler.get_registry();
+        reg.create(topic_name.clone());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+
+        let get_req = GetRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(get_req);
+        let res = aw!(handler.get(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let res = res.get_ref();
+        assert_eq!(res.name, sub_name);
+        assert_eq!(res.topic, topic_name);
+
+        let get_req = GetRequest {
+            topic: String::from("nope"),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(get_req);
+        let res = aw!(handler.get(req));
+        assert!(res.is_err());
+
+        let get_req = GetRequest {
+            topic: topic_name.clone(),
+            name: String::from("nope"),
+        };
+        let req = Request::new(get_req);
+        let res = aw!(handler.get(req));
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_list() {
+        let topic_name = String::from("topic");
+        let sub_name = String::from("first");
+        let second_sub_name = String::from("second");
+
+        let handler = Handler::default();
+
+        let reg = handler.get_registry();
+        reg.create(topic_name.clone());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+
+        let create_req = CreateRequest {
+            topic: topic_name.clone(),
+            name: second_sub_name.clone(),
+        };
+        let req = Request::new(create_req);
+        let res = aw!(handler.create(req));
+        assert!(res.is_ok());
+
+        let list_req = ListRequest {
+            topic: String::from("nope"),
+        };
+        let req = Request::new(list_req);
+        let stream = aw!(handler.list(req));
+        assert!(stream.is_err());
+
+        let list_req = ListRequest {
+            topic: topic_name.clone(),
+        };
+        let req = Request::new(list_req);
+        let stream = aw!(handler.list(req));
+        assert!(stream.is_ok());
+        let mut stream = stream.unwrap();
+        let mut stream = stream.get_mut();
+
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        let actual = match Pin::new(&mut stream).poll_next(&mut cx) {
+            Poll::Ready(actual) => actual,
+            _ => unimplemented!(),
+        };
+        assert!(actual.is_some());
+        let actual = actual.unwrap();
+        assert!(actual.is_ok());
+        let actual = actual.unwrap();
+        assert_eq!(actual.name, second_sub_name);
+        assert_eq!(actual.topic, topic_name);
+
+        let actual = match Pin::new(&mut stream).poll_next(&mut cx) {
+            Poll::Ready(actual) => actual,
+            _ => unimplemented!(),
+        };
+        assert!(actual.is_some());
+        let actual = actual.unwrap();
+        assert!(actual.is_ok());
+        let actual = actual.unwrap();
+        assert_eq!(actual.name, sub_name);
+        assert_eq!(actual.topic, topic_name);
+
+        let actual = match Pin::new(&mut stream).poll_next(&mut cx) {
+            Poll::Ready(actual) => actual,
+            _ => unimplemented!(),
+        };
+        assert!(actual.is_none());
     }
 }

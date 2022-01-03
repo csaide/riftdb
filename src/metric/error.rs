@@ -67,3 +67,26 @@ impl Error {
         }
     }
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_prometheus() {
+        let input = prometheus::Error::AlreadyReg;
+        let actual = Error::from("name".to_string(), input);
+        assert!(matches!(actual, Error::AlreadyRegistered {name} if name == "name"));
+
+        let input = prometheus::Error::InconsistentCardinality { expect: 1, got: 0 };
+        let actual = Error::from("name".to_string(), input);
+        assert!(
+            matches!(actual, Error::IncorrectLabelCount {name,expected,got} if name == "name" && expected == 1 && got == 0)
+        );
+
+        let input = prometheus::Error::Msg(String::from("hello"));
+        let actual = Error::from("name".to_string(), input);
+        assert!(matches!(actual, Error::Unknown {name, ..} if name == "name"))
+    }
+}

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use super::{LeaseTag, Result, Slot, Waker};
+use super::{Error, LeaseTag, Result, Slot, Waker};
 
 pub const DEFAULT_TTL: Duration = Duration::from_secs(10);
 pub const NO_CAPACITY: usize = 0;
@@ -99,6 +99,9 @@ where
     /// Ack the given message index.
     pub fn ack(&self, lease_id: u64, index: usize) -> Result<()> {
         let mut slots = self.slots.lock().unwrap();
+        if index >= slots.len() {
+            return Err(Error::IndexOutOfRange);
+        }
         let res = slots[index].ack(lease_id);
         if res.is_ok() {
             // MESSAGE_RESULTS.with_label_values(&[ACK_VALUE]).inc();
@@ -110,6 +113,9 @@ where
     /// Nack the given message index.
     pub fn nack(&self, lease_id: u64, index: usize) -> Result<()> {
         let mut slots = self.slots.lock().unwrap();
+        if index >= slots.len() {
+            return Err(Error::IndexOutOfRange);
+        }
         let res = slots[index].nack(lease_id);
         if res.is_ok() {
             // MESSAGE_RESULTS.with_label_values(&[NACK_VALUE]).inc();
@@ -174,6 +180,15 @@ impl<T> Default for Queue<T> {
 #[cfg(not(tarpaulin_include))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_builder() {
+        Queue::<usize>::builder()
+            .with_message_capacity(1024)
+            .with_subscription_capacity(1023)
+            .with_ttl(Duration::from_millis(100))
+            .build::<usize>();
+    }
 
     #[test]
     fn test_queue() {

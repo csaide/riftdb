@@ -90,3 +90,28 @@ pub fn new(cfg: &config::Config, bin: &'static str, version: &'static str) -> sl
     let drain = slog_async::Async::new(drain).build().fuse();
     slog::Logger::root(drain, o!("binary" => bin, "version" => version))
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default() {
+        default("test", "alpha");
+    }
+
+    #[test]
+    fn test_new() {
+        let cfg = Config {
+            json: true,
+            level: Level::Debug,
+        };
+        new(&cfg, "test", "alpha");
+        let cfg = Config {
+            json: false,
+            level: Level::Debug,
+        };
+        new(&cfg, "test", "alpha");
+    }
+}

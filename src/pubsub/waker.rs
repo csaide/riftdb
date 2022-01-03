@@ -36,15 +36,40 @@ impl Waker {
 
     /// Wake the oldest known waker in this instance, if no wakers are registered
     /// this is effectively a no-op.
-    pub fn wake(&mut self) {
+    pub fn wake(&mut self) -> bool {
         // Grab the oldest id or short circuit if we don't have any wakers currently.
         let id = match self.ids.pop_front() {
             Some(id) => id,
-            None => return,
+            None => return false,
         };
         // Pop the waker off the map and then consume it immediately by calling `wake()`.
         if let Some(waker) = self.wakers.remove(&id) {
-            waker.wake()
+            waker.wake();
+            return true;
         }
+        unreachable!()
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_waker() {
+        let mut waker = Waker::default();
+        assert_eq!(0, waker.wakers.len());
+        assert_eq!(0, waker.ids.len());
+
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        waker.register(first, futures::task::noop_waker());
+        waker.register(first, futures::task::noop_waker());
+        waker.register(second, futures::task::noop_waker());
+
+        assert!(waker.wake());
+        assert!(waker.wake());
+        assert!(!waker.wake());
     }
 }

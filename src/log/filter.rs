@@ -34,3 +34,23 @@ where
         }
     }
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter() {
+        let drain = slog::Discard {};
+        let filter = LevelFilter {
+            drain,
+            level: slog::Level::Info,
+        }
+        .fuse();
+        let logger = slog::Logger::root(filter, o!());
+
+        info!(&logger, "Info");
+        debug!(&logger, "Debug");
+    }
+}

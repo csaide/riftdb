@@ -30,8 +30,24 @@ impl<T> Sub<T> {
 impl<T> Default for Sub<T> {
     fn default() -> Self {
         Self {
+            updated: None,
             created: SystemTime::now(),
-            ..Default::default()
+            queue: Queue::default(),
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_subscription() {
+        let first = Sub::<u32>::default();
+        assert!(SystemTime::now().ge(&first.created));
+        let queue = Queue::default();
+        let second = Sub::<u32>::with_queue(queue);
+        assert_ne!(first.created, second.created);
     }
 }

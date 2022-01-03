@@ -85,3 +85,104 @@ pub async fn listen(addr: &SocketAddr) -> Result<(), hyper::Error> {
     srv.await?;
     Ok(())
 }
+
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+mod tests {
+    use super::*;
+
+    macro_rules! aw {
+        ($e:expr) => {
+            tokio_test::block_on($e)
+        };
+    }
+
+    #[test]
+    fn test_not_found() {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/nope")
+            .body(Body::empty())
+            .expect("failed to generate /nope request");
+
+        let res = aw!(router(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_server_error() {
+        let res = server_error();
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_no_content() {
+        let res = no_content();
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[test]
+    fn test_ready() {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/ready")
+            .body(Body::empty())
+            .expect("failed to generate /live request");
+
+        let res = aw!(router(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[test]
+    fn test_live() {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/live")
+            .body(Body::empty())
+            .expect("failed to generate /live request");
+
+        let res = aw!(router(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[test]
+    fn test_metrics_proto() {
+        let req = Request::builder()
+            .header("accept", PROTOBUF_FORMAT)
+            .method(Method::GET)
+            .uri("/metrics")
+            .body(Body::empty())
+            .expect("failed to generate metrics request");
+
+        let res = aw!(router(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_metrics_text() {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/metrics")
+            .body(Body::empty())
+            .expect("failed to generate metrics request");
+
+        let res = aw!(router(req));
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+}

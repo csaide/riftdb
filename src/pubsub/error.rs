@@ -30,4 +30,7 @@ pub enum Error {
     /// An error which occurs when there are no available empty slots.
     #[error("the queue is full and unable to accept new messages")]
     QueueFull,
+    /// An error which occrus when a lease index is out of range when attempting to ack/nack a messge.
+    #[error("the supplied slot index is out of range.")]
+    IndexOutOfRange,
 }
