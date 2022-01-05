@@ -22,7 +22,7 @@ pub enum Error {
     },
     /// Handles the case where the number of labels during write differs from the
     /// registered number of labels.
-    #[error("the provided label count is incorrect: got '{got}' but expected '{expected}'")]
+    #[error("the provided label count is incorrect for metric '{name}': got '{got}' but expected '{expected}'")]
     IncorrectLabelCount {
         /// The name of the metric.
         name: String,
