@@ -71,9 +71,8 @@ pub async fn run() -> ExitCode {
     let root_logger = log::new(&cfg.log_config, RIFTD, crate_version!());
 
     let mm = metric::Manager::new(
-        "rift".to_string(),
-        "grpc".to_string(),
         "riftd".to_string(),
+        "grpc".to_string(),
         crate_version!().to_string(),
     );
 

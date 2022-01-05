@@ -51,13 +51,14 @@ impl RiftInterceptor {
                 .register_int_counter(
                     "total_requests",
                     "The total count of gRPC requests seen by this server.",
+                    None,
                 )
                 .unwrap(),
             response_time: mm
                 .register_histogram(
                     "response_time",
                     "The response time over all received gRPC requests seen by this server.",
-                    &[],
+                    None,
                 )
                 .unwrap(),
         }
@@ -95,7 +96,6 @@ mod tests {
     fn test_interceptor() {
         let logger = slog::Logger::root(slog::Discard {}, o!());
         let mm = Manager::new(
-            String::from("test"),
             String::from("test"),
             String::from("test"),
             String::from("test"),
