@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# (c) Copyright 2021 Christian Saide
+# (c) Copyright 2021-2022 Christian Saide
 # SPDX-License-Identifier: GPL-3.0
 
 function list_files_missing_lic() {
@@ -49,7 +49,7 @@ function list_files_missing_copy() {
         -not -name '*.toml' \
         -not -name '*.pem' \
         -not -name '*.srl' \
-        -type f | xargs grep -L -E '(&copy;|\(c\)) Copyright 2021 Christian Saide'
+        -type f | xargs grep -L -E '(&copy;|\(c\)) Copyright 2021-2022 Christian Saide'
 }
 
 function count_files_missing_copy() {
@@ -68,7 +68,7 @@ fi
 
 if [ $(count_files_missing_copy) -ne 0 ]; then
     cat <<EOF
-There are files missing the '&copy;|(c) Copyright 2021 Christian Saide' copyright identifier.
+There are files missing the '&copy;|(c) Copyright 2021-2022 Christian Saide' copyright identifier.
 
 Files:
 $(list_files_missing_copy)

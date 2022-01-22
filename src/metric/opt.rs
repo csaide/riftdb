@@ -1,4 +1,4 @@
-// (c) Copyright 2021 Christian Saide <supernomad>
+// (c) Copyright 2021-2022 Christian Saide <supernomad>
 // SPDX-License-Identifier: GPL-3.0-only
 
 use std::collections::HashMap;

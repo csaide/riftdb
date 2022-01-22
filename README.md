@@ -1,4 +1,4 @@
 # riftdb
 
 ---
-&copy; Copyright 2021 Christian Saide
+&copy; Copyright 2021-2022 Christian Saide

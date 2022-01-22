@@ -1,4 +1,4 @@
-// (c) Copyright 2021 Christian Saide
+// (c) Copyright 2021-2022 Christian Saide
 // SPDX-License-Identifier: GPL-3.0
 
 /// A handful of error helpers for gRPC error conditions.
